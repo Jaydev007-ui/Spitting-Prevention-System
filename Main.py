@@ -5,13 +5,16 @@ from tensorflow.keras.models import load_model
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
 
+# Set Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon=":shield:")
 
 # Load the model
+# Use custom_objects if necessary, but this example assumes no custom layers
 model = load_model("Spitting.h5", compile=False)
 
 # Load the labels
-class_names = open("labels.txt", "r").readlines()
+with open("labels.txt", "r") as f:
+    class_names = f.readlines()
 
 # Streamlit interface
 st.title("Spitting Prevention System By Tech Social Shield")
@@ -70,8 +73,8 @@ if uploaded_image is not None:
         # Check if the confidence is above the 70% threshold
         if confidence_score >= threshold:
             # Display prediction and confidence score
-            st.write(f"**Prediction:** {class_name}")
-            st.write(f"**Confidence Score:** {str(np.round(confidence_score * 100, 2))}%")
+            st.write(f"*Prediction:* {class_name}")
+            st.write(f"*Confidence Score:* {str(np.round(confidence_score * 100, 2))}%")
 
             # If the predicted class is 'spitting', display the detected face with the bounding box
             if class_name.lower() == "spitting":
@@ -85,6 +88,6 @@ if uploaded_image is not None:
             else:
                 st.write("No spitting detected.")
         else:
-            st.write(f"Confidence below prescribed threshold. Prediction uncertain.")
+            st.write("Confidence below prescribed threshold. Prediction uncertain.")
     else:
         st.write("Unable to detect face, therefore cannot classify the image.")
