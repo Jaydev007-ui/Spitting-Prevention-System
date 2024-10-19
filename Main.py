@@ -6,7 +6,7 @@ from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
 
-st.set_page_config(page_title="Spitting Prevention System By Tech Social Shield", page_icon="🛡️")
+st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
 # Display custom logo at the top
 logo = Image.open("Logo.png")  # Replace with your image path
@@ -27,7 +27,7 @@ with open("labels.txt", "r") as file:
     class_names = file.readlines()
 
 # Streamlit interface
-st.title("Spitting Prevention System")
+st.title("Spitting Prevention System By Tech Social Shield")
 st.markdown("### Detect and prevent spitting in images with advanced facial recognition technology.")
 st.markdown("Upload an image to analyze whether any detected faces are exhibiting spitting behavior.")
 
@@ -42,6 +42,9 @@ if uploaded_image is not None:
     image = np.array(Image.open(uploaded_image).convert('RGB'))
     image_rgb = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
+    # Inform user that face detection is starting
+    st.write("Detecting faces in the uploaded image...")
+    
     # Initialize the face detector
     detector = MTCNN()
     results = detector.detect_faces(image_rgb)
@@ -99,3 +102,9 @@ if uploaded_image is not None:
             st.success("No spitting detected.")
     else:
         st.warning("No faces detected in the uploaded image.")
+
+# Footer information
+st.markdown("---")
+st.markdown("### Development Phase")
+st.markdown("This application is still in development. Your feedback is appreciated!")
+st.markdown("**Contact Developer:** [Jaydev Zala](mailto:jaydevzala07@gmail.com)  \n**GitHub:** [Jaydev007-ui](https://github.com/Jaydev007-ui)")
