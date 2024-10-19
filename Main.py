@@ -6,7 +6,11 @@ from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
 
-st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
+st.set_page_config(page_title="Spitting Prevention System By Tech Social Shield", page_icon="🛡️")
+
+# Display custom logo at the top
+logo = Image.open("path_to_your_custom_icon.png")  # Replace with your image path
+st.image(logo, use_column_width=True)
 
 # Custom DepthwiseConv2D class to ignore 'groups' argument
 class CustomDepthwiseConv2D(DepthwiseConv2D):
