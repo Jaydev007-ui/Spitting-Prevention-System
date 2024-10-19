@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 from tensorflow.keras.models import load_model
 from mtcnn.mtcnn import MTCNN
-import matplotlib.pyplot as plt
 from PIL import Image
 
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
