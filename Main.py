@@ -3,18 +3,16 @@ import cv2
 import numpy as np
 from tensorflow.keras.models import load_model
 from mtcnn.mtcnn import MTCNN
+import matplotlib.pyplot as plt
 from PIL import Image
 
-# Set Streamlit page configuration
-st.set_page_config(page_title="Spitting Prevention System", page_icon=":shield:")
+st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
 # Load the model
-# Use custom_objects if necessary, but this example assumes no custom layers
 model = load_model("Spitting.h5", compile=False)
 
 # Load the labels
-with open("labels.txt", "r") as f:
-    class_names = f.readlines()
+class_names = open("labels.txt", "r").readlines()
 
 # Streamlit interface
 st.title("Spitting Prevention System By Tech Social Shield")
@@ -30,64 +28,52 @@ if uploaded_image is not None:
     image = np.array(Image.open(uploaded_image).convert('RGB'))
     image_rgb = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)  # Ensure correct format for OpenCV processing
 
-    # Initialize face detector
-    detector = MTCNN()
+    # Resize the image to (224, 224) pixels as expected by the model
+    image_resized = cv2.resize(image_rgb, (224, 224), interpolation=cv2.INTER_AREA)
 
-    # Detect faces in the original image
-    results = detector.detect_faces(image_rgb)
+    # Convert the image to a numpy array and reshape it to the model's input shape (1, 224, 224, 3)
+    image_array = np.asarray(image_resized, dtype=np.float32).reshape(1, 224, 224, 3)
 
-    # If faces are detected, proceed with classification
-    if results:
-        st.write("Face detected, running classification...")
+    # Normalize the image to [0, 1] as expected by Teachable Machine
+    image_array = image_array / 255.0
 
-        # Draw bounding box around the detected face(s)
-        for result in results:
-            x, y, width, height = result['box']
-            # Draw bounding box on the image
-            cv2.rectangle(image_rgb, (x, y), (x + width, y + height), (0, 255, 0), 2)
+    # Make predictions using the model
+    prediction = model.predict(image_array)
 
-        # Resize the image to (224, 224) pixels as expected by the model
-        image_resized = cv2.resize(image_rgb, (224, 224), interpolation=cv2.INTER_AREA)
+    # Get the index of the highest predicted class
+    index = np.argmax(prediction)
 
-        # Convert the image to a numpy array and reshape it to the model's input shape (1, 224, 224, 3)
-        image_array = np.asarray(image_resized, dtype=np.float32).reshape(1, 224, 224, 3)
+    # Get the corresponding class label from the labels file
+    class_name = class_names[index].strip().split(' ', 1)[1]  # Extract the label only
 
-        # Normalize the image to [0, 1] as expected by the model
-        image_array = image_array / 255.0
+    # Get the confidence score of the prediction
+    confidence_score = prediction[0][index]
 
-        # Make predictions using the model
-        prediction = model.predict(image_array)
+    # Display prediction and confidence score
+    st.write(f"*Prediction:* {class_name}")
+    st.write(f"*Confidence Score:* {str(np.round(confidence_score * 100, 2))}%")
 
-        # Get the index of the highest predicted class
-        index = np.argmax(prediction)
+    # If the predicted class is 'spitting', detect faces
+    if class_name.lower() == "spitting":
+        st.write("Spitting detected, running face detection...")
+        detector = MTCNN()
+        
+        # Detect faces in the original image (before resizing)
+        results = detector.detect_faces(image_rgb)
 
-        # Get the confidence score of the prediction
-        confidence_score = prediction[0][index]
+        # If faces are detected, crop the image around the first detected face
+        if results:
+            for result in results:
+                x, y, width, height = result['box']
+                # Draw bounding box on the image
+                cv2.rectangle(image_rgb, (x, y), (x + width, y + height), (0, 255, 0), 2)
 
-        # Set a confidence threshold of 70% (0.7)
-        threshold = 0.7
+            # Convert the image back to RGB for display in Streamlit
+            image_rgb_cropped = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2RGB)
 
-        # Get the corresponding class label from the labels file
-        class_name = class_names[index].strip().split(' ', 1)[1]  # Extract the label only
-
-        # Check if the confidence is above the 70% threshold
-        if confidence_score >= threshold:
-            # Display prediction and confidence score
-            st.write(f"*Prediction:* {class_name}")
-            st.write(f"*Confidence Score:* {str(np.round(confidence_score * 100, 2))}%")
-
-            # If the predicted class is 'spitting', display the detected face with the bounding box
-            if class_name.lower() == "spitting":
-                st.write("Spitting detected, displaying face bounding box...")
-                
-                # Convert the image back to RGB for display in Streamlit
-                image_rgb_cropped = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2RGB)
-
-                # Display the image with the face bounding box
-                st.image(image_rgb_cropped, caption="Detected Face with Spitting", use_column_width=True)
-            else:
-                st.write("No spitting detected.")
+            # Display the image with the face bounding box
+            st.image(image_rgb_cropped, caption="Detected Face", use_column_width=True)
         else:
-            st.write("Confidence below prescribed threshold. Prediction uncertain.")
+            st.write("No faces detected.")
     else:
-        st.write("Unable to detect face, therefore cannot classify the image.")
+        st.write("No spitting detected.")
