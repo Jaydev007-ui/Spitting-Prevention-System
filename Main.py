@@ -19,10 +19,13 @@ class CustomDepthwiseConv2D(DepthwiseConv2D):
 model = load_model("Spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
 
 # Load the labels
-class_names = open("labels.txt", "r").readlines()
+with open("labels.txt", "r") as file:
+    class_names = file.readlines()
 
 # Streamlit interface
-st.title("Spitting Prevention System By Tech Social Shield")
+st.title("Spitting Prevention System")
+st.markdown("### Detect and prevent spitting in images with advanced facial recognition technology.")
+st.markdown("Upload an image to analyze whether any detected faces are exhibiting spitting behavior.")
 
 # Upload an image
 uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
@@ -33,7 +36,7 @@ if uploaded_image is not None:
     
     # Convert the uploaded file to an OpenCV image
     image = np.array(Image.open(uploaded_image).convert('RGB'))
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)  # Ensure correct format for OpenCV processing
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     # Initialize the face detector
     detector = MTCNN()
@@ -42,7 +45,8 @@ if uploaded_image is not None:
     # Check if any faces are detected
     if results:
         spitting_detected = False
-        
+        detection_results = []
+
         for result in results:
             x, y, width, height = result['box']
             # Crop the face from the image
@@ -65,9 +69,8 @@ if uploaded_image is not None:
             class_name = class_names[index].strip().split(' ', 1)[1]
             confidence_score = prediction[0][index]
 
-            # Display prediction and confidence score for each detected face
-            st.write(f"*Prediction for detected face:* {class_name}")
-            st.write(f"*Confidence Score:* {str(np.round(confidence_score * 100, 2))}%")
+            # Collect results for display
+            detection_results.append((class_name, confidence_score, (x, y, width, height)))
 
             # Check if the class is "spitting"
             if class_name.lower() == "spitting":
@@ -81,9 +84,14 @@ if uploaded_image is not None:
         # Display the image with the face bounding boxes
         st.image(image_rgb_cropped, caption="Detected Faces", use_column_width=True)
 
+        # Show detection results
+        st.markdown("### Detection Results:")
+        for class_name, confidence_score, _ in detection_results:
+            st.write(f"- **Face**: {class_name}, **Confidence**: {np.round(confidence_score * 100, 2)}%")
+
         if spitting_detected:
-            st.write("Spitting detected in one or more faces!")
+            st.markdown("<h3 style='color: red;'>Alert!</h3><p>Spitting detected in the image.</p>", unsafe_allow_html=True)
         else:
-            st.write("No spitting detected in any faces.")
+            st.success("No spitting detected.")
     else:
-        st.write("No faces detected.")
+        st.warning("No faces detected in the uploaded image.")
