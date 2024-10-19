@@ -4,3 +4,5 @@ pandas
 matplotlib
 opencv-python
 mtcnn
+streamlit
+opencv-python-headless
