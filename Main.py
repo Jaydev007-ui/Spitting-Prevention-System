@@ -2,13 +2,21 @@ import streamlit as st
 import cv2
 import numpy as np
 from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
 
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
-# Load the model
-model = load_model("Spitting.h5", compile=False)
+# Custom DepthwiseConv2D class to ignore 'groups' argument
+class CustomDepthwiseConv2D(DepthwiseConv2D):
+    def __init__(self, *args, **kwargs):
+        if 'groups' in kwargs:
+            del kwargs['groups']  # Remove the unsupported argument
+        super().__init__(*args, **kwargs)
+
+# Load the model with custom objects
+model = load_model("Spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
 
 # Load the labels
 class_names = open("labels.txt", "r").readlines()
