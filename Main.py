@@ -7,6 +7,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
+import subprocess
 
 # Directory to save detected faces
 SAVE_DIR = "Detected Faces"
@@ -44,21 +45,15 @@ st.markdown("Upload an image to analyze whether any detected faces are exhibitin
 uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
 if uploaded_image is not None:
-    # Display the uploaded image
     st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
-    
-    # Convert the uploaded file to an OpenCV image
     image = np.array(Image.open(uploaded_image).convert('RGB'))
     image_rgb = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-    # Inform user that face detection is starting
     st.write("Detecting faces in the uploaded image...")
 
-    # Initialize the face detector
     detector = MTCNN()
     results = detector.detect_faces(image_rgb)
 
-    # Check if any faces are detected
     if results:
         spitting_detected = False
         detection_results = []
@@ -66,62 +61,46 @@ if uploaded_image is not None:
 
         for result in results:
             x, y, width, height = result['box']
-            # Crop the face from the image
             face = image_rgb[y:y + height, x:x + width]
-            
-            # Resize the face to (224, 224) pixels as expected by the model
             face_resized = cv2.resize(face, (224, 224), interpolation=cv2.INTER_AREA)
-
-            # Convert the face to a numpy array and reshape it
             face_array = np.asarray(face_resized, dtype=np.float32).reshape(1, 224, 224, 3)
             face_array = face_array / 255.0  # Normalize the image
 
-            # Make predictions using the model
             prediction = model.predict(face_array)
-
-            # Get the index of the highest predicted class
             index = np.argmax(prediction)
-
-            # Get the corresponding class label
             class_name = class_names[index].strip().split(' ', 1)[1]
             confidence_score = prediction[0][index]
-
-            # Collect results for display
             detection_results.append((class_name, confidence_score, (x, y, width, height)))
 
-            # Check if the class is "spitting" and if the confidence is above the threshold
             if class_name.lower() == "spitting" and confidence_score > confidence_threshold:
                 spitting_detected = True
-                # Draw bounding box on the original image
                 cv2.rectangle(image_rgb, (x, y), (x + width, y + height), (0, 255, 0), 2)
 
-        # Convert the image back to RGB for display in Streamlit
         image_rgb_cropped = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2RGB)
 
-        # Display the image with the face bounding boxes if spitting is detected
         if spitting_detected:
             st.image(image_rgb_cropped, caption="Detected Faces", use_column_width=True)
-
-            # Find the class with the highest confidence score
             highest_confidence_result = max(detection_results, key=lambda x: x[1])
             class_name, confidence_score, (x, y, width, height) = highest_confidence_result
 
             st.markdown("### Detection Result:")
             st.write(f"- **Class**: {class_name}, **Confidence**: {np.round(confidence_score * 100, 2)}%")
 
-            # Save the detected faces classified as "spitting" locally
             for result in detection_results:
                 detected_class_name, detected_confidence_score, (x, y, width, height) = result
                 
                 if detected_class_name.lower() == "spitting" and detected_confidence_score > confidence_threshold:
-                    # Crop the face from the original image
                     spitting_face = image_rgb[y:y + height, x:x + width]
-
-                    # Create a unique filename
                     face_filename = f"{SAVE_DIR}/spitting_face_{int(time.time())}.jpg"
-                    
-                    # Save the image to the local directory
                     cv2.imwrite(face_filename, spitting_face)
+
+                    # Git operations to commit and push changes
+                    try:
+                        subprocess.run(["git", "add", face_filename], check=True)
+                        subprocess.run(["git", "commit", "-m", f"Add detected spitting face: {face_filename}"], check=True)
+                        subprocess.run(["git", "push"], check=True)
+                    except subprocess.CalledProcessError as e:
+                        st.error(f"Failed to save to GitHub: {e}")
 
             st.markdown("<h3 style='color: red;'>Alert!</h3>", unsafe_allow_html=True)
             st.error("Spitting detected in the image! Detected faces have been saved.")
