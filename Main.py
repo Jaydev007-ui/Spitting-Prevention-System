@@ -9,14 +9,8 @@ from mtcnn.mtcnn import MTCNN
 from PIL import Image
 import subprocess
 
+# Set up the Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
-
-# Directory to save detected faces
-SAVE_DIR = "Detected Faces"
-
-# Create the directory if it doesn't exist
-if not os.path.exists(SAVE_DIR):
-    os.makedirs(SAVE_DIR)
 
 # Function to set up Git configuration
 def setup_git():
@@ -32,6 +26,26 @@ def setup_git():
 
 # Call the Git setup function
 setup_git()
+
+# Directory to save detected faces
+SAVE_DIR = "Detected Faces"
+
+# Create the directory if it doesn't exist
+if not os.path.exists(SAVE_DIR):
+    os.makedirs(SAVE_DIR)
+
+# Function to set remote URL to HTTPS
+def set_git_remote_https():
+    try:
+        # Replace with your GitHub username and repo name
+        repo_url = "https://github.com/Jaydev007-ui/Spitting-Prevention-System"
+        subprocess.run(["git", "remote", "set-url", "origin", repo_url], check=True)
+        st.success("Remote URL set to HTTPS.")
+    except subprocess.CalledProcessError as e:
+        st.error(f"Failed to set remote URL: {e}")
+
+# Set the Git remote URL
+set_git_remote_https()
 
 # Display custom logo at the top
 logo = Image.open("Logo.png")  # Replace with your image path
