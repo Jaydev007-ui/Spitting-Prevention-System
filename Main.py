@@ -18,8 +18,8 @@ if not os.path.exists(SAVE_DIR):
 
 # Function to set up Git configuration
 def setup_git():
-    user_email = "your_email@example.com"  # Replace with your email
-    user_name = "Your Name"  # Replace with your name
+    user_email = "jaydevzala07@gmail.com"  # Replace with your email
+    user_name = "Jaydev007-ui"  # Replace with your name
 
     try:
         subprocess.run(["git", "config", "--global", "user.email", user_email], check=True)
