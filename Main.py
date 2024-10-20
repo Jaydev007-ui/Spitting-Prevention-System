@@ -12,44 +12,12 @@ import subprocess
 # Set up the Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
-# Function to set up Git configuration
-def setup_git():
-    user_email = "jaydevzala07@gmail.com"  # Replace with your email
-    user_name = "Jaydev007-ui"  # Replace with your name
-
-    try:
-        subprocess.run(["git", "config", "--global", "user.email", user_email], check=True)
-        subprocess.run(["git", "config", "--global", "user.name", user_name], check=True)
-        st.success("Git user configuration set.")
-    except subprocess.CalledProcessError as e:
-        st.error(f"Failed to set Git user configuration: {e}")
-
-# Call the Git setup function
-setup_git()
-
 # Directory to save detected faces
 SAVE_DIR = "Detected Faces"
 
 # Create the directory if it doesn't exist
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
-
-# Function to set remote URL to HTTPS
-def set_git_remote_https():
-    try:
-        # Replace with your GitHub username and repo name
-        repo_url = "https://github.com/Jaydev007-ui/Spitting-Prevention-System.git"
-        subprocess.run(["git", "remote", "set-url", "origin", repo_url], check=True)
-        st.success("Remote URL set to HTTPS.")
-    except subprocess.CalledProcessError as e:
-        st.error(f"Failed to set remote URL: {e}")
-
-# Set the Git remote URL
-set_git_remote_https()
-
-# Display custom logo at the top
-logo = Image.open("Logo.png")  # Replace with your image path
-st.image(logo, use_column_width=True)
 
 # Custom DepthwiseConv2D class to ignore 'groups' argument
 class CustomDepthwiseConv2D(DepthwiseConv2D):
@@ -72,6 +40,19 @@ st.markdown("Upload an image to analyze whether any detected faces are exhibitin
 
 # Upload an image
 uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+
+# Input for GitHub credentials
+username = "Jaydev007-ui"
+token = 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
+
+def push_to_github(filename, username, token):
+    try:
+        subprocess.run(["git", "add", filename], check=True)
+        subprocess.run(["git", "commit", "-m", f"Add detected spitting face: {filename}"], check=True)
+        subprocess.run(["git", "push", f"https://{username}:{token}@github.com/{username}/Spitting-Prevention-System.git"], check=True)  # Update with your repo URL
+        st.success("Image saved and pushed to GitHub.")
+    except subprocess.CalledProcessError as e:
+        st.error(f"Failed to save to GitHub: {e}")
 
 if uploaded_image is not None:
     st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
@@ -123,13 +104,9 @@ if uploaded_image is not None:
                     face_filename = f"{SAVE_DIR}/spitting_face_{int(time.time())}.jpg"
                     cv2.imwrite(face_filename, spitting_face)
 
-                    # Git operations to commit and push changes
-                    try:
-                        subprocess.run(["git", "add", face_filename], check=True)
-                        subprocess.run(["git", "commit", "-m", f"Add detected spitting face: {face_filename}"], check=True)
-                        subprocess.run(["git", "push"], check=True)
-                    except subprocess.CalledProcessError as e:
-                        st.error(f"Failed to save to GitHub: {e}")
+                    # Push the saved image to GitHub
+                    if username and token:  # Ensure credentials are provided
+                        push_to_github(face_filename, username, token)
 
             st.markdown("<h3 style='color: red;'>Alert!</h3>", unsafe_allow_html=True)
             st.error("Spitting detected in the image! Detected faces have been saved.")
