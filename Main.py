@@ -1,3 +1,5 @@
+import os
+import time
 import streamlit as st
 import cv2
 import numpy as np
@@ -5,6 +7,13 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
+
+# Directory to save detected faces
+SAVE_DIR = "Detected Faces"
+
+# Create the directory if it doesn't exist
+if not os.path.exists(SAVE_DIR):
+    os.makedirs(SAVE_DIR)
 
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
@@ -44,7 +53,7 @@ if uploaded_image is not None:
 
     # Inform user that face detection is starting
     st.write("Detecting faces in the uploaded image...")
-    
+
     # Initialize the face detector
     detector = MTCNN()
     results = detector.detect_faces(image_rgb)
@@ -53,6 +62,7 @@ if uploaded_image is not None:
     if results:
         spitting_detected = False
         detection_results = []
+        confidence_threshold = 0.5  # Set a confidence threshold
 
         for result in results:
             x, y, width, height = result['box']
@@ -79,8 +89,8 @@ if uploaded_image is not None:
             # Collect results for display
             detection_results.append((class_name, confidence_score, (x, y, width, height)))
 
-            # Check if the class is "spitting"
-            if class_name.lower() == "spitting":
+            # Check if the class is "spitting" and if the confidence is above the threshold
+            if class_name.lower() == "spitting" and confidence_score > confidence_threshold:
                 spitting_detected = True
                 # Draw bounding box on the original image
                 cv2.rectangle(image_rgb, (x, y), (x + width, y + height), (0, 255, 0), 2)
@@ -88,18 +98,35 @@ if uploaded_image is not None:
         # Convert the image back to RGB for display in Streamlit
         image_rgb_cropped = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2RGB)
 
-        # Display the image with the face bounding boxes
-        st.image(image_rgb_cropped, caption="Detected Faces", use_column_width=True)
-
-        # Show detection results
-        st.markdown("### Detection Results:")
-        for class_name, confidence_score, _ in detection_results:
-            st.write(f"- **Face**: {class_name}, **Confidence**: {np.round(confidence_score * 100, 2)}%")
-
+        # Display the image with the face bounding boxes if spitting is detected
         if spitting_detected:
-            st.markdown("<h3 style='color: red;'>Alert!</h3><p>Spitting detected in the image.</p>", unsafe_allow_html=True)
+            st.image(image_rgb_cropped, caption="Detected Faces", use_column_width=True)
+
+            # Find the class with the highest confidence score
+            highest_confidence_result = max(detection_results, key=lambda x: x[1])
+            class_name, confidence_score, (x, y, width, height) = highest_confidence_result
+
+            st.markdown("### Detection Result:")
+            st.write(f"- **Class**: {class_name}, **Confidence**: {np.round(confidence_score * 100, 2)}%")
+
+            # Save the detected faces classified as "spitting" locally
+            for result in detection_results:
+                detected_class_name, detected_confidence_score, (x, y, width, height) = result
+                
+                if detected_class_name.lower() == "spitting" and detected_confidence_score > confidence_threshold:
+                    # Crop the face from the original image
+                    spitting_face = image_rgb[y:y + height, x:x + width]
+
+                    # Create a unique filename
+                    face_filename = f"{SAVE_DIR}/spitting_face_{int(time.time())}.jpg"
+                    
+                    # Save the image to the local directory
+                    cv2.imwrite(face_filename, spitting_face)
+
+            st.markdown("<h3 style='color: red;'>Alert!</h3>", unsafe_allow_html=True)
+            st.error("Spitting detected in the image! Detected faces have been saved.")
         else:
-            st.success("No spitting detected.")
+            st.success("No spitting detected. Faces detected, but none exhibiting spitting behavior.")
     else:
         st.warning("No faces detected in the uploaded image.")
 
