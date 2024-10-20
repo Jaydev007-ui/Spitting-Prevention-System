@@ -9,6 +9,8 @@ from mtcnn.mtcnn import MTCNN
 from PIL import Image
 import subprocess
 
+st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
+
 # Directory to save detected faces
 SAVE_DIR = "Detected Faces"
 
@@ -30,8 +32,6 @@ def setup_git():
 
 # Call the Git setup function
 setup_git()
-
-st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
 # Display custom logo at the top
 logo = Image.open("Logo.png")  # Replace with your image path
