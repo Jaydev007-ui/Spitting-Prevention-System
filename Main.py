@@ -38,7 +38,7 @@ if not os.path.exists(SAVE_DIR):
 def set_git_remote_https():
     try:
         # Replace with your GitHub username and repo name
-        repo_url = "https://github.com/Jaydev007-ui/Spitting-Prevention-System"
+        repo_url = "https://github.com/Jaydev007-ui/Spitting-Prevention-System.git"
         subprocess.run(["git", "remote", "set-url", "origin", repo_url], check=True)
         st.success("Remote URL set to HTTPS.")
     except subprocess.CalledProcessError as e:
