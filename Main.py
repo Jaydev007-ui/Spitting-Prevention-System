@@ -12,6 +12,9 @@ import subprocess
 # Set up the Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
+logo = Image.open("Logo.png")  # Replace with your image path
+st.image(logo, use_column_width=True)
+
 # Directory to save detected faces
 SAVE_DIR = "Detected Faces"
 
