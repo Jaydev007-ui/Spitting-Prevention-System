@@ -16,6 +16,21 @@ SAVE_DIR = "Detected Faces"
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 
+# Function to set up Git configuration
+def setup_git():
+    user_email = "your_email@example.com"  # Replace with your email
+    user_name = "Your Name"  # Replace with your name
+
+    try:
+        subprocess.run(["git", "config", "--global", "user.email", user_email], check=True)
+        subprocess.run(["git", "config", "--global", "user.name", user_name], check=True)
+        st.success("Git user configuration set.")
+    except subprocess.CalledProcessError as e:
+        st.error(f"Failed to set Git user configuration: {e}")
+
+# Call the Git setup function
+setup_git()
+
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
 # Display custom logo at the top
