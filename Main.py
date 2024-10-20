@@ -43,9 +43,16 @@ uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"]
 
 # Input for GitHub credentials
 username = "Jaydev007-ui"
-token = "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"
+token = "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"
 user_email = "jaydevzala07@gmail.com"
 user_name = username
+
+def set_git_config(email, name):
+    try:
+        subprocess.run(["git", "config", "--global", "user.email", email], check=True)
+        subprocess.run(["git", "config", "--global", "user.name", name], check=True)
+    except subprocess.CalledProcessError as e:
+        st.error(f"Failed to set Git config: {e}")
 
 def push_to_github(filename, username, token):
     try:
@@ -70,6 +77,10 @@ if uploaded_image is not None:
         spitting_detected = False
         detection_results = []
         confidence_threshold = 0.5  # Set a confidence threshold
+
+        # Set Git user configuration
+        if user_email and user_name:
+            set_git_config(user_email, user_name)
 
         for result in results:
             x, y, width, height = result['box']
