@@ -59,7 +59,6 @@ def push_to_github(filename, username, token):
         subprocess.run(["git", "add", filename], check=True)
         subprocess.run(["git", "commit", "-m", f"Add detected spitting face: {filename}"], check=True)
         subprocess.run(["git", "push", f"https://{username}:{token}@github.com/{username}/Spitting-Prevention-System.git"], check=True)  # Update with your repo URL
-        st.success("Image saved and pushed to GitHub.")
     except subprocess.CalledProcessError as e:
         st.error(f"Failed to save to GitHub: {e}")
 
@@ -122,7 +121,7 @@ if uploaded_image is not None:
                         push_to_github(face_filename, username, token)
 
             st.markdown("<h3 style='color: red;'>Alert!</h3>", unsafe_allow_html=True)
-            st.error("Spitting detected in the image! Detected faces have been saved.")
+            st.success("Spitting detected in the image! Detected faces have been saved.")
         else:
             st.success("No spitting detected. Faces detected, but none exhibiting spitting behavior.")
     else:
