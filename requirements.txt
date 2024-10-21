@@ -1,4 +1,8 @@
-opencv-python-headless
+streamlit
+opencv-python
+numpy
 tensorflow
 mtcnn
-pillow
+Pillow
+PyGithub
+streamlit-oauth
