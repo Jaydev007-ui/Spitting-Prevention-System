@@ -64,7 +64,7 @@ def push_to_github(filename, username, token):
         subprocess.run(["git", "branch", "-M", "main"], check = True)
         # subprocess.run(["git", "remote", "add", "origin", "https://github.com/Jaydev007-ui/Spitting-Prevention-System.git"], check = True)
         # subprocess.run(["git", "push", f"https://{username}:{token}@github.com/{username}/Spitting-Prevention-System.git"], check=True)  # Update with your repo URL
-        subprocess.run(["git", "push", "-U", "origin", "main"], check=True)
+        subprocess.run(["git", "push", "-u", "origin", "main"], check=True)
     except subprocess.CalledProcessError as e:
         st.error(f"Failed to save to GitHub: {e}")
 
