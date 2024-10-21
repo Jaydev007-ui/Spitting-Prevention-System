@@ -8,6 +8,23 @@ from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
 import subprocess
+import json
+from pathlib import Path
+
+# Load configuration
+def load_config():
+    config_path = Path.home() / '.spitting_prevention_config.json'
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    return {}
+
+config = load_config()
+
+# GitHub configuration
+GITHUB_USERNAME = os.getenv('Jaydev007-ui') or config.get('Jaydev007-ui')
+GITHUB_EMAIL = os.getenv('jaydevzala07@gmail.com') or config.get('jaydevzala07@gmail.com')
+GITHUB_REPO = os.getenv('https://github.com/Jaydev007-ui/Spitting-Prevention-System.git') or config.get('https://github.com/Jaydev007-ui/Spitting-Prevention-System.git')
 
 # Set up the Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
@@ -44,29 +61,28 @@ st.markdown("Upload an image to analyze whether any detected faces are exhibitin
 # Upload an image
 uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
-# Input for GitHub credentials
-username = "Jaydev007-ui"
-token = "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"
-user_email = "jaydevzala07@gmail.com"
-user_name = username
-
-def set_git_config(email, name):
+def set_git_config():
     try:
-        subprocess.run(["git", "config", "--global", "user.email", email], check=True)
-        subprocess.run(["git", "config", "--global", "user.name", name], check=True)
+        subprocess.run(["git", "config", "--global", "user.email", GITHUB_EMAIL], check=True)
+        subprocess.run(["git", "config", "--global", "user.name", GITHUB_USERNAME], check=True)
     except subprocess.CalledProcessError as e:
         st.error(f"Failed to set Git config: {e}")
 
-def push_to_github(filename, username, token):
+def push_to_github(filename):
     try:
+        # Add and commit the file
         subprocess.run(["git", "add", filename], check=True)
         subprocess.run(["git", "commit", "-m", f"Add detected spitting face: {filename}"], check=True)
-        subprocess.run(["git", "branch", "-M", "main"], check = True)
-        # subprocess.run(["git", "remote", "add", "origin", "https://github.com/Jaydev007-ui/Spitting-Prevention-System.git"], check = True)
-        # subprocess.run(["git", "push", f"https://{username}:{token}@github.com/{username}/Spitting-Prevention-System.git"], check=True)  # Update with your repo URL
-        subprocess.run(["git", "push", "-u", "origin", "main"], check=True)
+        
+        # Push to GitHub
+        subprocess.run(["git", "push", "origin", "main"], check=True)
+        
+        st.success("Successfully pushed to GitHub")
     except subprocess.CalledProcessError as e:
         st.error(f"Failed to save to GitHub: {e}")
+        st.error(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
+        if e.output:
+            st.error(f"Command output: {e.output}")
 
 if uploaded_image is not None:
     st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
@@ -84,8 +100,8 @@ if uploaded_image is not None:
         confidence_threshold = 0.5  # Set a confidence threshold
 
         # Set Git user configuration
-        if user_email and user_name:
-            set_git_config(user_email, user_name)
+        if GITHUB_EMAIL and GITHUB_USERNAME:
+            set_git_config()
 
         for result in results:
             x, y, width, height = result['box']
@@ -123,8 +139,10 @@ if uploaded_image is not None:
                     cv2.imwrite(face_filename, spitting_face)
 
                     # Push the saved image to GitHub
-                    if username and token:  # Ensure credentials are provided
-                        push_to_github(face_filename, username, token)
+                    if GITHUB_USERNAME and GITHUB_EMAIL and GITHUB_REPO:
+                        push_to_github(face_filename)
+                    else:
+                        st.warning("GitHub credentials not set. Unable to push to repository.")
 
             st.markdown("<h3 style='color: red;'>Alert!</h3>", unsafe_allow_html=True)
             st.success("Spitting detected in the image! Detected faces have been saved.")
