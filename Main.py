@@ -21,10 +21,14 @@ def load_config():
 
 config = load_config()
 
-# GitHub configuration
-GITHUB_USERNAME = os.getenv('Jaydev007-ui') or config.get('Jaydev007-ui')
-GITHUB_EMAIL = os.getenv('jaydevzala07@gmail.com') or config.get('jaydevzala07@gmail.com')
-GITHUB_REPO = os.getenv('https://github.com/Jaydev007-ui/Spitting-Prevention-System.git') or config.get('https://github.com/Jaydev007-ui/Spitting-Prevention-System.git')
+# # GitHub configuration
+# GITHUB_USERNAME = os.getenv('Jaydev007-ui') or config.get('Jaydev007-ui')
+# GITHUB_EMAIL = os.getenv('jaydevzala07@gmail.com') or config.get('jaydevzala07@gmail.com')
+# GITHUB_REPO = os.getenv('https://github.com/Jaydev007-ui/Spitting-Prevention-System.git') or config.get('https://github.com/Jaydev007-ui/Spitting-Prevention-System.git')
+
+GITHUB_USERNAME = os.getenv('GITHUB_USERNAME') or config.get('GITHUB_USERNAME')
+GITHUB_EMAIL = os.getenv('GITHUB_EMAIL') or config.get('GITHUB_EMAIL')
+GITHUB_REPO = os.getenv('GITHUB_REPO') or config.get('GITHUB_REPO')
 
 # Set up the Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
