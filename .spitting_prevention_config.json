@@ -1,5 +1,11 @@
 {
-  "GITHUB_USERNAME": "Jaydev007-ui",
-  "GITHUB_EMAIL": "jaydevzala07@gmail.com",
-  "GITHUB_REPO": "https://github.com/Jaydev007-ui/Spitting-Prevention-System.git"
+    "GITHUB_CLIENT_ID": "Ov23li9OtknkckB4gQLj",
+    "GITHUB_CLIENT_SECRET": "e97a8cc206691c9f3c928a1d6816a4389f7cf726",
+    "GITHUB_REPO": "Spitting-Prevention-System",
+    "REDIRECT_URI": "https://techsocialshield.streamlit.app/",
+    "MODEL_PATH": "Spitting.h5",
+    "LABELS_PATH": "labels.txt",
+    "LOGO_PATH": "Logo.png",
+    "SAVE_DIR": "Detected Faces",
+    "CONFIDENCE_THRESHOLD": 0.5
 }
