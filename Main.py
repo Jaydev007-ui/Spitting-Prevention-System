@@ -59,7 +59,14 @@ class CustomDepthwiseConv2D(DepthwiseConv2D):
         super().__init__(*args, **kwargs)
 
 # Load the model with custom objects
-model = load_model("Spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+# model = load_model("Spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+try:
+    model = load_model("Spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+    st.success("Model loaded successfully")
+except Exception as e:
+    st.error(f"Error loading model: {str(e)}")
+    st.error(f"Error type: {type(e).__name__}")
+    raise
 
 # Load the labels
 with open("labels.txt", "r") as file:
