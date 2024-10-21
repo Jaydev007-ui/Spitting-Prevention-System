@@ -1,8 +1,5 @@
 streamlit
 opencv-python-headless
-numpy
 tensorflow
 mtcnn
 Pillow
-PyGithub
-streamlit-oauth
