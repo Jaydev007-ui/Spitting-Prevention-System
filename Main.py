@@ -46,7 +46,7 @@ uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"]
 
 # Input for GitHub credentials
 username = "Jaydev007-ui"
-token = "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"
+token = "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"
 user_email = "jaydevzala07@gmail.com"
 user_name = username
 
