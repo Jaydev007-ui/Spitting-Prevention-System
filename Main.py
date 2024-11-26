@@ -7,6 +7,9 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 import subprocess
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 
 # Set up the Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
