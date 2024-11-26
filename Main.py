@@ -58,13 +58,20 @@ def push_to_github(filename, username, token):
         st.error(f"Failed to save to GitHub: {e}")
 
 # Function to capture video from the webcam
+# Function to capture video from the webcam
 def capture_from_camera():
     cap = cv2.VideoCapture(0)  # Open webcam (0 is usually the default camera)
     detector = MTCNN()
+    
+    # Set up the Streamlit image placeholder to update the frames dynamically
+    frame_placeholder = st.empty()
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
+            st.error("Failed to capture frame from camera.")
             break
+        
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = detector.detect_faces(frame_rgb)
         
@@ -97,7 +104,6 @@ def capture_from_camera():
             if spitting_detected:
                 highest_confidence_result = max(detection_results, key=lambda x: x[1])
                 class_name, confidence_score, (x, y, width, height) = highest_confidence_result
-                st.image(frame, caption="Detected Faces", use_column_width=True)
                 st.markdown("### Detection Result:")
                 st.write(f"- **Class**: {class_name}, **Confidence**: {np.round(confidence_score * 100, 2)}%")
 
@@ -120,21 +126,11 @@ def capture_from_camera():
             st.warning("No faces detected.")
         
         # Display the frame in the Streamlit app
-        st.image(frame, caption="Live Video Stream", use_column_width=True)
+        frame_placeholder.image(frame, channels="BGR", use_column_width=True)  # Use Streamlit's image function
 
         if st.button('Stop'):
             break
 
     cap.release()
-    cv2.destroyAllWindows()
 
-# Button to start the live stream
-if st.button('Start Camera'):
-    capture_from_camera()
-
-# Footer information
-st.markdown("---")
-st.markdown("### Development Phase")
-st.markdown("This application is still in development. Your feedback is appreciated!")
-st.markdown("**Contact Developer:** [Jaydev Zala](mailto:jaydevzala07@gmail.com)  \n**GitHub:** [Jaydev007-ui](https://github.com/Jaydev007-ui)")
 
