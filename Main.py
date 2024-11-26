@@ -6,13 +6,14 @@ import numpy as np
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
+from PIL import Image
 import subprocess
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
 
 # Set up the Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
+
+logo = Image.open("Logo.png")  # Replace with your image path
+st.image(logo, use_column_width=True)
 
 # Directory to save detected faces
 SAVE_DIR = "Detected Faces"
@@ -37,7 +38,11 @@ with open("labels.txt", "r") as file:
 
 # Streamlit interface
 st.title("Spitting Prevention System By Tech Social Shield")
-st.markdown("### Detect and prevent spitting in live video stream with advanced facial recognition technology.")
+st.markdown("### Detect and prevent spitting in videos with advanced facial recognition technology.")
+st.markdown("Upload a video to analyze whether any detected faces are exhibiting spitting behavior.")
+
+# Upload a video
+uploaded_video = st.file_uploader("Upload a video", type=["mp4", "avi", "mov"])
 
 # Input for GitHub credentials
 username = "Jaydev007-ui"
@@ -60,33 +65,28 @@ def push_to_github(filename, username, token):
     except subprocess.CalledProcessError as e:
         st.error(f"Failed to save to GitHub: {e}")
 
-# Function to capture video from the webcam
-# Function to capture video from the webcam
-def capture_from_camera():
-    cap = cv2.VideoCapture(0)  # Open webcam (0 is usually the default camera)
+if uploaded_video is not None:
+    tfile = tempfile.NamedTemporaryFile(delete=False)
+    tfile.write(uploaded_video.read())
+    video = cv2.VideoCapture(tfile.name)
+    stframe = st.empty()
     detector = MTCNN()
-    
-    # Set up the Streamlit image placeholder to update the frames dynamically
-    frame_placeholder = st.empty()
+    spitting_detected = False
+    detection_results = []
 
-    while cap.isOpened():
-        ret, frame = cap.read()
+    # Set Git user configuration
+    if user_email and user_name:
+        set_git_config(user_email, user_name)
+
+    while video.isOpened():
+        ret, frame = video.read()
         if not ret:
-            st.error("Failed to capture frame from camera.")
             break
-        
+
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = detector.detect_faces(frame_rgb)
-        
+
         if results:
-            spitting_detected = False
-            detection_results = []
-            confidence_threshold = 0.5  # Set a confidence threshold
-
-            # Set Git user configuration
-            if user_email and user_name:
-                set_git_config(user_email, user_name)
-
             for result in results:
                 x, y, width, height = result['box']
                 face = frame_rgb[y:y + height, x:x + width]
@@ -100,40 +100,31 @@ def capture_from_camera():
                 confidence_score = prediction[0][index]
                 detection_results.append((class_name, confidence_score, (x, y, width, height)))
 
-                if class_name.lower() == "spitting" and confidence_score > confidence_threshold:
+                if class_name.lower() == "spitting" and confidence_score > 0.5:
                     spitting_detected = True
-                    cv2.rectangle(frame, (x, y), (x + width, y + height), (0, 255, 0), 2)
+                    cv2.rectangle(frame_rgb, (x, y), (x + width, y + height), (0, 255, 0), 2)
+                    spitting_face = frame_rgb[y:y + height, x:x + width]
+                    face_filename = f"{SAVE_DIR}/spitting_face_{int(time.time())}.jpg"
+                    cv2.imwrite(face_filename, spitting_face)
 
-            if spitting_detected:
-                highest_confidence_result = max(detection_results, key=lambda x: x[1])
-                class_name, confidence_score, (x, y, width, height) = highest_confidence_result
-                st.markdown("### Detection Result:")
-                st.write(f"- **Class**: {class_name}, **Confidence**: {np.round(confidence_score * 100, 2)}%")
+                    # Push the saved image to GitHub
+                    if username and token:  # Ensure credentials are provided
+                        push_to_github(face_filename, username, token)
 
-                for result in detection_results:
-                    detected_class_name, detected_confidence_score, (x, y, width, height) = result
-                    if detected_class_name.lower() == "spitting" and detected_confidence_score > confidence_threshold:
-                        spitting_face = frame_rgb[y:y + height, x:x + width]
-                        face_filename = f"{SAVE_DIR}/spitting_face_{int(time.time())}.jpg"
-                        cv2.imwrite(face_filename, spitting_face)
-
-                        # Push the saved image to GitHub
-                        if username and token:  # Ensure credentials are provided
-                            push_to_github(face_filename, username, token)
-
-                st.markdown("<h3 style='color: red;'>Alert!</h3>", unsafe_allow_html=True)
-                st.success("Spitting detected in the live stream! Detected faces have been saved.")
-            else:
-                st.success("No spitting detected.")
+            stframe.image(frame_rgb, channels="RGB", use_column_width=True)
         else:
-            st.warning("No faces detected.")
-        
-        # Display the frame in the Streamlit app
-        frame_placeholder.image(frame, channels="BGR", use_column_width=True)  # Use Streamlit's image function
+            stframe.image(frame, channels="BGR", use_column_width=True)
 
-        if st.button('Stop'):
-            break
+    video.release()
+    if spitting_detected:
+        st.success("Spitting detected in the video!")
+    else:
+        st.success("No spitting detected in the video.")
+else:
+    st.warning("Please upload a video.")
 
-    cap.release()
-
-
+# Footer information
+st.markdown("---")
+st.markdown("### Development Phase")
+st.markdown("This application is still in development. Your feedback is appreciated!")
+st.markdown("**Contact Developer:** [Jaydev Zala](mailto:jaydevzala07@gmail.com)  \n**GitHub:** [Jaydev007-ui](https://github.com/Jaydev007-ui)")
