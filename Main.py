@@ -15,19 +15,13 @@ import subprocess
 # Set up the Streamlit page configuration
 st.set_page_config(page_title="Face Pose Detection System", page_icon="🛡️")
 
-logo = Image.open("Logo.png")  # Replace with your image path
+logo = Image.open(os.path.join(os.getcwd(), "Logo.png"))  # Ensure the correct path
 st.image(logo, use_column_width=True)
 
 # Directory to save detected faces
 SAVE_DIR = "Detected Faces"
-
-# Create the directory if it doesn't exist
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
-
-# Load the labels
-with open("labels.txt", "r") as file:
-    class_names = file.readlines()
 
 # Streamlit interface
 st.title("Face Pose Detection System By Tech Social Shield")
@@ -41,7 +35,7 @@ ip_address = st.text_input("Enter Live Stream IP Address (e.g., rtsp://192.168.1
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 mtcnn = MTCNN(image_size=160, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709, post_process=True, device=device)
 
-# Helper functions for pose prediction and visualization
+# Helper functions
 def npAngle(a, b, c):
     ba = a - b
     bc = c - b 
@@ -65,24 +59,20 @@ def visualizeCV2(frame, landmarks_, angle_R_, angle_L_, pred_):
 def predFacePose(frame):
     bbox_, prob_, landmarks_ = mtcnn.detect(frame, landmarks=True)
     angle_R_List, angle_L_List, predLabelList = [], [], []
-    for bbox, landmarks, prob in zip(bbox_, landmarks_, prob_):
-        if bbox is not None and prob > 0.9:
-            angR = npAngle(landmarks[0], landmarks[1], landmarks[2])
-            angL = npAngle(landmarks[1], landmarks[0], landmarks[2])
-            angle_R_List.append(angR)
-            angle_L_List.append(angL)
-            predLabel = 'Frontal' if (35 <= int(angR) <= 57 and 35 <= int(angL) <= 58) else ('Left Profile' if angR < angL else 'Right Profile')
-            predLabelList.append(predLabel)
+    if bbox_ is not None:
+        for bbox, landmarks, prob in zip(bbox_, landmarks_, prob_):
+            if prob > 0.9:
+                angR = npAngle(landmarks[0], landmarks[1], landmarks[2])
+                angL = npAngle(landmarks[1], landmarks[0], landmarks[2])
+                angle_R_List.append(angR)
+                angle_L_List.append(angL)
+                predLabel = 'Frontal' if (35 <= int(angR) <= 57 and 35 <= int(angL) <= 58) else ('Left Profile' if angR < angL else 'Right Profile')
+                predLabelList.append(predLabel)
     return landmarks_, angle_R_List, angle_L_List, predLabelList
 
-def set_git_config(email, name):
-    try:
-        subprocess.run(["git", "config", "--global", "user.email", email], check=True)
-        subprocess.run(["git", "config", "--global", "user.name", name], check=True)
-    except subprocess.CalledProcessError as e:
-        st.error(f"Failed to set Git config: {e}")
-
-def push_to_github(filename, username, token):
+def push_to_github(filename):
+    username = st.secrets["github"]["username"]
+    token = st.secrets["github"]["token"]
     try:
         subprocess.run(["git", "add", filename], check=True)
         subprocess.run(["git", "commit", "-m", f"Add detected face: {filename}"], check=True)
@@ -100,34 +90,7 @@ if ip_address:
         ret, frame = video.read()
         if not ret:
             st.warning("Failed to retrieve frame from the IP stream. Check the IP address.")
-            break
+           
 
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        landmarks_, angle_R_List, angle_L_List, predLabelList = predFacePose(frame_rgb)
-
-        if landmarks_:
-            visualizeCV2(frame_rgb, landmarks_, angle_R_List, angle_L_List, predLabelList)
-            stframe.image(frame_rgb, channels="RGB", use_column_width=True)
-            for pred in predLabelList:
-                if pred:  # Save detected faces for each prediction
-                    face_detected = True
-                    face_filename = f"{SAVE_DIR}/face_{int(time.time())}.jpg"
-                    cv2.imwrite(face_filename, frame_rgb)
-                    push_to_github(face_filename, "Jaydev007-ui", "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")
-                    st.success("Face detected and saved!")
-                    break
-
-        else:
-            stframe.image(frame, channels="BGR", use_column_width=True)
-
-    video.release()
-else:
-    st.warning("Please enter a valid IP address for the live stream.")
-
-# Footer information
-st.markdown("---")
-st.markdown("### Development Phase")
-st.markdown("This application is still in development. Your feedback is appreciated!")
-st.markdown("**Contact Developer:** [Jaydev Zala](mailto:jaydevzala07@gmail.com)  \n**GitHub:** [Jaydev007-ui](https://github.com/Jaydev007-ui)")
 
 
