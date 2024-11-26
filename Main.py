@@ -39,11 +39,11 @@ with open("labels.txt", "r") as file:
 
 # Streamlit interface
 st.title("Spitting Prevention System By Tech Social Shield")
-st.markdown("### Detect and prevent spitting in videos with advanced facial recognition technology.")
-st.markdown("Upload a video to analyze whether any detected faces are exhibiting spitting behavior.")
+st.markdown("### Detect and prevent spitting in live streams with advanced facial recognition technology.")
+st.markdown("Enter the IP address of the live stream to analyze whether any detected faces are exhibiting spitting behavior.")
 
-# Upload a video
-uploaded_video = st.file_uploader("Upload a video", type=["mp4", "avi", "mov"])
+# Input for live stream IP address
+ip_address = st.text_input("Enter Live Stream IP Address (e.g., rtsp://192.168.1.100:8080)")
 
 # Input for GitHub credentials
 username = "Jaydev007-ui"
@@ -66,10 +66,8 @@ def push_to_github(filename, username, token):
     except subprocess.CalledProcessError as e:
         st.error(f"Failed to save to GitHub: {e}")
 
-if uploaded_video is not None:
-    tfile = tempfile.NamedTemporaryFile(delete=False)
-    tfile.write(uploaded_video.read())
-    video = cv2.VideoCapture(tfile.name)
+if ip_address:
+    video = cv2.VideoCapture(ip_address)
     stframe = st.empty()
     detector = MTCNN()
     spitting_detected = False
@@ -82,6 +80,7 @@ if uploaded_video is not None:
     while video.isOpened():
         ret, frame = video.read()
         if not ret:
+            st.warning("Failed to retrieve frame from the IP stream. Check the IP address.")
             break
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -118,14 +117,15 @@ if uploaded_video is not None:
 
     video.release()
     if spitting_detected:
-        st.success("Spitting detected in the video!")
+        st.success("Spitting detected in the live stream!")
     else:
-        st.success("No spitting detected in the video.")
+        st.success("No spitting detected in the live stream.")
 else:
-    st.warning("Please upload a video.")
+    st.warning("Please enter a valid IP address for the live stream.")
 
 # Footer information
 st.markdown("---")
 st.markdown("### Development Phase")
 st.markdown("This application is still in development. Your feedback is appreciated!")
 st.markdown("**Contact Developer:** [Jaydev Zala](mailto:jaydevzala07@gmail.com)  \n**GitHub:** [Jaydev007-ui](https://github.com/Jaydev007-ui)")
+
