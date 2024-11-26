@@ -115,7 +115,8 @@ if ip_address:
                     break  # Stop further processing once spitting is detected
 
             if not spitting_detected:
-                stframe.image(frame_rgb, channels="RGB", use_column_width=True)
+                stframe.image(frame_rgb, channels="RGB", use_container_width=True)
+
         else:
             stframe.image(frame, channels="BGR", use_column_width=True)
 
