@@ -71,13 +71,12 @@ if ip_address:
     stframe = st.empty()
     detector = MTCNN()
     spitting_detected = False
-    detection_results = []
 
     # Set Git user configuration
     if user_email and user_name:
         set_git_config(user_email, user_name)
 
-    while video.isOpened():
+    while video.isOpened() and not spitting_detected:
         ret, frame = video.read()
         if not ret:
             st.warning("Failed to retrieve frame from the IP stream. Check the IP address.")
@@ -98,10 +97,10 @@ if ip_address:
                 index = np.argmax(prediction)
                 class_name = class_names[index].strip().split(' ', 1)[1]
                 confidence_score = prediction[0][index]
-                detection_results.append((class_name, confidence_score, (x, y, width, height)))
 
                 if class_name.lower() == "spitting" and confidence_score > 0.5:
                     spitting_detected = True
+                    stframe.image(frame_rgb, channels="RGB", use_column_width=True)
                     cv2.rectangle(frame_rgb, (x, y), (x + width, y + height), (0, 255, 0), 2)
                     spitting_face = frame_rgb[y:y + height, x:x + width]
                     face_filename = f"{SAVE_DIR}/spitting_face_{int(time.time())}.jpg"
@@ -111,15 +110,16 @@ if ip_address:
                     if username and token:  # Ensure credentials are provided
                         push_to_github(face_filename, username, token)
 
-            stframe.image(frame_rgb, channels="RGB", use_column_width=True)
+                    # Break the stream and show the message
+                    st.success("Spitting detected! Stopping the live stream...")
+                    break  # Stop further processing once spitting is detected
+
+            if not spitting_detected:
+                stframe.image(frame_rgb, channels="RGB", use_column_width=True)
         else:
             stframe.image(frame, channels="BGR", use_column_width=True)
 
     video.release()
-    if spitting_detected:
-        st.success("Spitting detected in the live stream!")
-    else:
-        st.success("No spitting detected in the live stream.")
 else:
     st.warning("Please enter a valid IP address for the live stream.")
 
