@@ -68,7 +68,12 @@ def predFacePose(frame):
                 angle_L_List.append(angL)
                 predLabel = 'Frontal' if (35 <= int(angR) <= 57 and 35 <= int(angL) <= 58) else ('Left Profile' if angR < angL else 'Right Profile')
                 predLabelList.append(predLabel)
-    return landmarks_, angle_R_List, angle_L_List, predLabelList
+    return bbox_, landmarks_, angle_R_List, angle_L_List, predLabelList
+
+def save_face(frame, bbox, filename):
+    x1, y1, x2, y2 = [int(i) for i in bbox]
+    face = frame[y1:y2, x1:x2]
+    cv2.imwrite(filename, face)
 
 def push_to_github(filename):
     username = st.secrets["github"]["username"]
@@ -84,12 +89,35 @@ def push_to_github(filename):
 if ip_address:
     video = cv2.VideoCapture(ip_address)
     stframe = st.empty()
-    face_detected = False
 
-    while video.isOpened() and not face_detected:
+    while video.isOpened():
         ret, frame = video.read()
         if not ret:
             st.warning("Failed to retrieve frame from the IP stream. Check the IP address.")
+            break
+        
+        # Detect face pose
+        bbox_, landmarks_, angle_R_List, angle_L_List, predLabelList = predFacePose(frame)
+        
+        # If faces are detected, save them and display
+        if bbox_ is not None:
+            for i, (bbox, landmarks, angle_R, angle_L, predLabel) in enumerate(zip(bbox_, landmarks_, angle_R_List, angle_L_List, predLabelList)):
+                # Save each detected face
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                filename = os.path.join(SAVE_DIR, f"detected_face_{timestamp}_{i}.jpg")
+                save_face(frame, bbox, filename)
+                
+                # Push to GitHub
+                push_to_github(filename)
+
+            # Draw and display landmarks and predictions
+            visualizeCV2(frame, landmarks_, angle_R_List, angle_L_List, predLabelList)
+
+        # Display frame in Streamlit
+        stframe.image(frame, channels="BGR", use_column_width=True)
+
+    video.release()
+
            
 
 
