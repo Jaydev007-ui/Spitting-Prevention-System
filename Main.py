@@ -1,123 +1,140 @@
-import tempfile
 import os
 import time
 import streamlit as st
 import cv2
 import numpy as np
+from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import DepthwiseConv2D
+from mtcnn.mtcnn import MTCNN
 from PIL import Image
-import torch
-from facenet_pytorch import MTCNN
-import math
-import requests
-from matplotlib import pyplot as plt
 import subprocess
 
 # Set up the Streamlit page configuration
-st.set_page_config(page_title="Face Pose Detection System", page_icon="🛡️")
+st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
-logo = Image.open(os.path.join(os.getcwd(), "Logo.png"))  # Ensure the correct path
+logo = Image.open("Logo.png")  # Replace with your image path
 st.image(logo, use_column_width=True)
 
 # Directory to save detected faces
 SAVE_DIR = "Detected Faces"
+
+# Create the directory if it doesn't exist
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 
+# Custom DepthwiseConv2D class to ignore 'groups' argument
+class CustomDepthwiseConv2D(DepthwiseConv2D):
+    def __init__(self, *args, **kwargs):
+        if 'groups' in kwargs:
+            del kwargs['groups']  # Remove the unsupported argument
+        super().__init__(*args, **kwargs)
+
+# Load the model with custom objects
+model = load_model("keras_model.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+
+# Load the labels
+with open("labels.txt", "r") as file:
+    class_names = file.readlines()
+
 # Streamlit interface
-st.title("Face Pose Detection System By Tech Social Shield")
-st.markdown("### Detect face poses in live streams with advanced facial recognition technology.")
-st.markdown("Enter the IP address of the live stream to analyze detected faces' poses.")
+st.title("Spitting Prevention System By Tech Social Shield")
+st.markdown("### Detect and prevent spitting in images with advanced facial recognition technology.")
+st.markdown("Upload an image to analyze whether any detected faces are exhibiting spitting behavior.")
 
-# Input for live stream IP address
-ip_address = st.text_input("Enter Live Stream IP Address (e.g., rtsp://192.168.1.100:8080)")
+# Upload an image
+uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
-# Device configuration
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-mtcnn = MTCNN(image_size=160, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709, post_process=True, device=device)
+# Input for GitHub credentials
+username = "Jaydev007-ui"
+token = "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"
+user_email = "jaydevzala07@gmail.com"
+user_name = username
 
-# Helper functions
-def npAngle(a, b, c):
-    ba = a - b
-    bc = c - b 
-    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-    angle = np.arccos(cosine_angle)
-    return np.degrees(angle)
+def set_git_config(email, name):
+    try:
+        subprocess.run(["git", "config", "--global", "user.email", email], check=True)
+        subprocess.run(["git", "config", "--global", "user.name", name], check=True)
+    except subprocess.CalledProcessError as e:
+        st.error(f"Failed to set Git config: {e}")
 
-def visualizeCV2(frame, landmarks_, angle_R_, angle_L_, pred_):
-    lineColor = (255, 255, 0)
-    fontScale = 2
-    fontThickness = 3
-    for landmarks, angle_R, angle_L, pred in zip(landmarks_, angle_R_, angle_L_, pred_):
-        color = (0, 0, 0) if pred == 'Frontal' else (255, 0, 0) if pred == 'Right Profile' else (0, 0, 255)
-        for land in landmarks:
-            cv2.circle(frame, (int(land[0]), int(land[1])), radius=5, color=(0, 255, 255), thickness=-1)
-        cv2.line(frame, (int(landmarks[0][0]), int(landmarks[0][1])), (int(landmarks[1][0]), int(landmarks[1][1])), lineColor, 3)
-        cv2.line(frame, (int(landmarks[0][0]), int(landmarks[0][1])), (int(landmarks[2][0]), int(landmarks[2][1])), lineColor, 3)
-        cv2.line(frame, (int(landmarks[1][0]), int(landmarks[1][1])), (int(landmarks[2][0]), int(landmarks[2][1])), lineColor, 3)
-        cv2.putText(frame, pred, (int(landmarks[0][0]), int(landmarks[0][1])), cv2.FONT_HERSHEY_PLAIN, fontScale, color, fontThickness, cv2.LINE_AA)
-
-def predFacePose(frame):
-    bbox_, prob_, landmarks_ = mtcnn.detect(frame, landmarks=True)
-    angle_R_List, angle_L_List, predLabelList = [], [], []
-    if bbox_ is not None:
-        for bbox, landmarks, prob in zip(bbox_, landmarks_, prob_):
-            if prob > 0.9:
-                angR = npAngle(landmarks[0], landmarks[1], landmarks[2])
-                angL = npAngle(landmarks[1], landmarks[0], landmarks[2])
-                angle_R_List.append(angR)
-                angle_L_List.append(angL)
-                predLabel = 'Frontal' if (35 <= int(angR) <= 57 and 35 <= int(angL) <= 58) else ('Left Profile' if angR < angL else 'Right Profile')
-                predLabelList.append(predLabel)
-    return bbox_, landmarks_, angle_R_List, angle_L_List, predLabelList
-
-def save_face(frame, bbox, filename):
-    x1, y1, x2, y2 = [int(i) for i in bbox]
-    face = frame[y1:y2, x1:x2]
-    cv2.imwrite(filename, face)
-
-def push_to_github(filename):
-    username = st.secrets["github"]["username"]
-    token = st.secrets["github"]["token"]
+def push_to_github(filename, username, token):
     try:
         subprocess.run(["git", "add", filename], check=True)
-        subprocess.run(["git", "commit", "-m", f"Add detected face: {filename}"], check=True)
-        subprocess.run(["git", "push", f"https://{username}:{token}@github.com/{username}/Face-Pose-Detection-System.git"], check=True)
+        subprocess.run(["git", "commit", "-m", f"Add detected spitting face: {filename}"], check=True)
+        subprocess.run(["git", "push", f"https://{username}:{token}@github.com/{username}/Spitting-Prevention-System.git"], check=True)  # Update with your repo URL
     except subprocess.CalledProcessError as e:
         st.error(f"Failed to save to GitHub: {e}")
 
-# Run the video capture and processing
-if ip_address:
-    video = cv2.VideoCapture(ip_address)
-    stframe = st.empty()
+if uploaded_image is not None:
+    st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
+    image = np.array(Image.open(uploaded_image).convert('RGB'))
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-    while video.isOpened():
-        ret, frame = video.read()
-        if not ret:
-            st.warning("Failed to retrieve frame from the IP stream. Check the IP address.")
-            break
-        
-        # Detect face pose
-        bbox_, landmarks_, angle_R_List, angle_L_List, predLabelList = predFacePose(frame)
-        
-        # If faces are detected, save them and display
-        if bbox_ is not None:
-            for i, (bbox, landmarks, angle_R, angle_L, predLabel) in enumerate(zip(bbox_, landmarks_, angle_R_List, angle_L_List, predLabelList)):
-                # Save each detected face
-                timestamp = time.strftime("%Y%m%d-%H%M%S")
-                filename = os.path.join(SAVE_DIR, f"detected_face_{timestamp}_{i}.jpg")
-                save_face(frame, bbox, filename)
+    st.write("Detecting faces in the uploaded image...")
+
+    detector = MTCNN()
+    results = detector.detect_faces(image_rgb)
+
+    if results:
+        spitting_detected = False
+        detection_results = []
+        confidence_threshold = 0.5  # Set a confidence threshold
+
+        # Set Git user configuration
+        if user_email and user_name:
+            set_git_config(user_email, user_name)
+
+        for result in results:
+            x, y, width, height = result['box']
+            face = image_rgb[y:y + height, x:x + width]
+            face_resized = cv2.resize(face, (224, 224), interpolation=cv2.INTER_AREA)
+            face_array = np.asarray(face_resized, dtype=np.float32).reshape(1, 224, 224, 3)
+            face_array = face_array / 255.0  # Normalize the image
+
+            prediction = model.predict(face_array)
+            index = np.argmax(prediction)
+            class_name = class_names[index].strip().split(' ', 1)[1]
+            confidence_score = prediction[0][index]
+            detection_results.append((class_name, confidence_score, (x, y, width, height)))
+
+            if class_name.lower() == "spitting" and confidence_score > confidence_threshold:
+                spitting_detected = True
+                cv2.rectangle(image_rgb, (x, y), (x + width, y + height), (0, 255, 0), 2)
+
+        image_rgb_cropped = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2RGB)
+
+        if spitting_detected:
+            st.image(image_rgb_cropped, caption="Detected Faces", use_column_width=True)
+            highest_confidence_result = max(detection_results, key=lambda x: x[1])
+            class_name, confidence_score, (x, y, width, height) = highest_confidence_result
+
+            st.markdown("### Detection Result:")
+            st.write(f"- **Class**: {class_name}, **Confidence**: {np.round(confidence_score * 100, 2)}%")
+
+            for result in detection_results:
+                detected_class_name, detected_confidence_score, (x, y, width, height) = result
                 
-                # Push to GitHub
-                push_to_github(filename)
+                if detected_class_name.lower() == "spitting" and detected_confidence_score > confidence_threshold:
+                    spitting_face = image_rgb[y:y + height, x:x + width]
+                    face_filename = f"{SAVE_DIR}/spitting_face_{int(time.time())}.jpg"
+                    cv2.imwrite(face_filename, spitting_face)
 
-            # Draw and display landmarks and predictions
-            visualizeCV2(frame, landmarks_, angle_R_List, angle_L_List, predLabelList)
+                    # Push the saved image to GitHub
+                    if username and token:  # Ensure credentials are provided
+                        push_to_github(face_filename, username, token)
 
-        # Display frame in Streamlit
-        stframe.image(frame, channels="BGR", use_column_width=True)
+            st.markdown("<h3 style='color: red;'>Alert!</h3>", unsafe_allow_html=True)
+            st.success("Spitting detected in the image! Detected faces have been saved.")
+        else:
+            st.success("No spitting detected. Faces detected, but none exhibiting spitting behavior.")
+    else:
+        st.warning("No faces detected in the uploaded image.")
 
-    video.release()
-
+# Footer information
+st.markdown("---")
+st.markdown("### Development Phase")
+st.markdown("This application is still in development. Your feedback is appreciated!")
+st.markdown("**Contact Developer:** [Jaydev Zala](mailto:jaydevzala07@gmail.com)  \n**GitHub:** [Jaydev007-ui](https://github.com/Jaydev007-ui)")
            
 
 
