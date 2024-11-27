@@ -1,2 +1,1 @@
-0 Spitting
-1 Non-Spitting
+Face
