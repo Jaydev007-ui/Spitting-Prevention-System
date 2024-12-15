@@ -4,4 +4,4 @@ Pillow
 tensorflow
 mtcnn
 numpy
-cv2
+opencv
