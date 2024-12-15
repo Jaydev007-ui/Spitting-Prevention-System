@@ -30,7 +30,7 @@ class CustomDepthwiseConv2D(DepthwiseConv2D):
         super().__init__(*args, **kwargs)
 
 # Load the model with custom objects
-model = load_model("keras_model.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+model = load_model("spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
 
 # Load the labels
 with open("labels.txt", "r") as file:
