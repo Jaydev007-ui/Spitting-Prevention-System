@@ -30,7 +30,11 @@ class CustomDepthwiseConv2D(DepthwiseConv2D):
         super().__init__(*args, **kwargs)
 
 # Load the model with custom objects
-model = load_model("spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+try:
+    model = load_model("spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+except Exception as e:
+    st.error(f"Failed to load model: {e}")
+
 
 # Load the labels
 with open("labels.txt", "r") as file:
@@ -61,9 +65,14 @@ def push_to_github(filename, username, token):
     try:
         subprocess.run(["git", "add", filename], check=True)
         subprocess.run(["git", "commit", "-m", f"Add detected spitting face: {filename}"], check=True)
-        subprocess.run(["git", "push", f"https://{username}:{token}@github.com/{username}/Spitting-Prevention-System.git"], check=True)  # Update with your repo URL
+        result = subprocess.run(
+            ["git", "push", f"https://{username}:{token}@github.com/{username}/Spitting-Prevention-System.git"],
+            check=True, capture_output=True, text=True
+        )
+        st.success(f"Successfully pushed {filename} to GitHub")
     except subprocess.CalledProcessError as e:
-        st.error(f"Failed to save to GitHub: {e}")
+        st.error(f"Failed to save to GitHub: {e.stderr}")
+
 
 if uploaded_image is not None:
     st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
