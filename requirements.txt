@@ -4,4 +4,3 @@ Pillow
 tensorflow
 mtcnn
 numpy
-opencv
