@@ -13,7 +13,7 @@ import subprocess
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
 
 logo = Image.open("Logo.png")  # Replace with your image path
-st.image(logo, use_column_width=True)
+st.image(logo, use_container_width=True)
 
 # Directory to save detected faces
 SAVE_DIR = "Detected Faces"
@@ -75,7 +75,7 @@ def push_to_github(filename, username, token):
 
 
 if uploaded_image is not None:
-    st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
+    st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
     image = np.array(Image.open(uploaded_image).convert('RGB'))
     image_rgb = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
@@ -113,7 +113,7 @@ if uploaded_image is not None:
         image_rgb_cropped = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2RGB)
 
         if spitting_detected:
-            st.image(image_rgb_cropped, caption="Detected Faces", use_column_width=True)
+            st.image(image_rgb_cropped, caption="Detected Faces", use_container_width=True)
             highest_confidence_result = max(detection_results, key=lambda x: x[1])
             class_name, confidence_score, (x, y, width, height) = highest_confidence_result
 
