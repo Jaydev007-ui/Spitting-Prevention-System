@@ -1,1 +1,2 @@
-Face
+0 Spitting
+1 Not Spitting
