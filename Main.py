@@ -31,7 +31,7 @@ class CustomDepthwiseConv2D(DepthwiseConv2D):
 
 # Load the model with custom objects
 try:
-    model = load_model("keras_model.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+    model = load_model("spitting.h5", compile=False, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
 except Exception as e:
     st.error(f"Failed to load model: {e}")
 
