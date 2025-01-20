@@ -1,6 +1,7 @@
 streamlit
 opencv-python-headless
-Pillow
 tensorflow
 mtcnn
+Pillow
+sqlite3
 numpy
