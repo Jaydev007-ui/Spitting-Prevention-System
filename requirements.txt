@@ -1,5 +1,5 @@
 streamlit
-opencv-python
+pip install opencv-python-headless
 tensorflow
 mtcnn
 Pillow
