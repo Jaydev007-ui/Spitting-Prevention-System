@@ -8,6 +8,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
+import hashlib
 import sqlite3
 
 # Set up the Streamlit page configuration
@@ -138,7 +139,6 @@ else:
                     face_array = np.asarray(face_resized, dtype=np.float32).reshape(1, 224, 224, 3)
                     face_array = face_array / 255.0
                     
-                    # Model prediction
                     prediction = model.predict(face_array)
                     index = np.argmax(prediction)
                     class_name = class_names[index].strip().split(' ', 1)[1]
@@ -179,7 +179,7 @@ else:
                     for employee in employees:
                         employee_face = cv2.imdecode(np.frombuffer(employee[5], np.uint8), cv2.IMREAD_COLOR)
                         
-                        # Simple face matching
+                        # Simple face matching (you might want to use a more sophisticated method)
                         if np.mean(cv2.absdiff(detected_face, cv2.resize(employee_face, detected_face.shape[:2]))) < 50:
                             st.write(f"Matched Employee: {employee[1]}")
                             st.write(f"Mobile: {employee[2]}, Email: {employee[3]}")
