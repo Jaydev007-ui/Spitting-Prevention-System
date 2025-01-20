@@ -4,3 +4,4 @@ tensorflow
 mtcnn
 Pillow
 numpy
+face_recognition
