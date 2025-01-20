@@ -4,5 +4,5 @@ tensorflow
 mtcnn
 Pillow
 numpy
-dlib
-face_recognition
+dlib==19.24.0
+face_recognition==1.3.0
