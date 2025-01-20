@@ -9,6 +9,7 @@ from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
 import sqlite3
+import face_recognition
 
 # Set up the Streamlit page configuration
 st.set_page_config(page_title="Spitting Prevention System", page_icon="🛡️")
@@ -163,41 +164,65 @@ else:
         
         # Display detected spitting faces
       # Inside the Spitting History section where face matching is done
+st.subheader("Spitting History")
+
+# Load detected spitting faces
 for filename in os.listdir(SAVE_DIR):
     if filename.endswith(".jpg"):
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            st.image(os.path.join(SAVE_DIR, filename), width=200)
-        with col2:
-            st.write(f"Detected at: {filename.split('_')[-1].split('.')[0]}")
+        detected_face_path = os.path.join(SAVE_DIR, filename)
+        detected_face = face_recognition.load_image_file(detected_face_path)
+        detected_face_encoding = face_recognition.face_encodings(detected_face)
+
+        if len(detected_face_encoding) == 0:
+            st.write("No face detected in this image.")
+            continue
+        
+        detected_face_encoding = detected_face_encoding[0]  # Get the first face encoding
+        
+        # Get all employees and compare with detected face
+        c.execute("SELECT * FROM employees")
+        employees = c.fetchall()
+
+        match_found = False
+
+        for employee in employees:
+            employee_face_bytes = employee[5]
+            employee_face_image = cv2.imdecode(np.frombuffer(employee_face_bytes, np.uint8), cv2.IMREAD_COLOR)
             
-            # Read the detected face
-            detected_face = cv2.imread(os.path.join(SAVE_DIR, filename))
-            detected_face = cv2.resize(detected_face, (224, 224))  # Resize to match dimensions
+            # Convert to RGB for face_recognition
+            employee_face_rgb = cv2.cvtColor(employee_face_image, cv2.COLOR_BGR2RGB)
+            employee_face_encoding = face_recognition.face_encodings(employee_face_rgb)
+
+            if len(employee_face_encoding) == 0:
+                continue  # Skip if no face is detected in employee photo
+
+            employee_face_encoding = employee_face_encoding[0]  # Get the first face encoding
             
-            # Fetch employee photos from the database
-            c.execute("SELECT * FROM employees")
-            employees = c.fetchall()
+            # Compare detected face with employee face
+            results = face_recognition.compare_faces([employee_face_encoding], detected_face_encoding)
+            face_distance = face_recognition.face_distance([employee_face_encoding], detected_face_encoding)
 
-            for employee in employees:
-                # Convert employee's photo blob back to an image
-                employee_face = cv2.imdecode(np.frombuffer(employee[5], np.uint8), cv2.IMREAD_COLOR)
-                employee_face = cv2.resize(employee_face, (224, 224))  # Resize to match dimensions
+            if results[0] and face_distance[0] < 0.6:  # Threshold for a match (lower = stricter)
+                match_found = True
+                st.write(f"Detected at: {filename.split('_')[-1].split('.')[0]}")
                 
-                # Ensure both images have the same number of channels (e.g., 3 for RGB)
-                if detected_face.shape[-1] != employee_face.shape[-1]:
-                    detected_face = cv2.cvtColor(detected_face, cv2.COLOR_BGR2RGB) if detected_face.shape[-1] == 3 else cv2.cvtColor(detected_face, cv2.COLOR_RGB2BGR)
+                # Show employee details
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    st.image(employee_face_image, width=100)
+                with col2:
+                    st.write(f"Matched Employee: {employee[1]}")  # Name
+                    st.write(f"Mobile: {employee[2]}")            # Mobile
+                    st.write(f"Email: {employee[3]}")             # Email
+                    st.write(f"Address: {employee[4]}")           # Address
                 
-                # Calculate the absolute difference
-                diff = np.mean(cv2.absdiff(detected_face, employee_face))
-
-                # Set a threshold to check if they are similar
-                if diff < 50:  # You can adjust the threshold based on accuracy needs
-                    st.write(f"Matched Employee: {employee[1]}")
-                    st.write(f"Mobile: {employee[2]}, Email: {employee[3]}")
-                    st.image(employee[5], width=100)
-                    break
-
+                # Show detected spitting face
+                st.image(detected_face_path, width=200)
+                break
+        
+        if not match_found:
+            st.write("No employee match found for this detected spitting face.")
+            st.image(detected_face_path, width=200)
 
 # Logout button
 if st.session_state.logged_in:
