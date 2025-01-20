@@ -8,7 +8,6 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import DepthwiseConv2D
 from mtcnn.mtcnn import MTCNN
 from PIL import Image
-import hashlib
 import sqlite3
 
 # Set up the Streamlit page configuration
