@@ -4,6 +4,5 @@ Pillow
 tensorflow
 mtcnn
 numpy
-sqlite3
 dlib
 face_recognition
