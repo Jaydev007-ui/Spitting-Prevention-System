@@ -3,5 +3,4 @@ opencv-python
 tensorflow
 mtcnn
 Pillow
-sqlite3
 numpy
