@@ -162,28 +162,42 @@ else:
         st.subheader("Spitting History")
         
         # Display detected spitting faces
-        for filename in os.listdir(SAVE_DIR):
-            if filename.endswith(".jpg"):
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.image(os.path.join(SAVE_DIR, filename), width=200)
-                with col2:
-                    st.write(f"Detected at: {filename.split('_')[-1].split('.')[0]}")
-                    
-                    # Face matching
-                    detected_face = cv2.imread(os.path.join(SAVE_DIR, filename))
-                    c.execute("SELECT * FROM employees")
-                    employees = c.fetchall()
-                    
-                    for employee in employees:
-                        employee_face = cv2.imdecode(np.frombuffer(employee[5], np.uint8), cv2.IMREAD_COLOR)
-                        
-                        # Simple face matching (you might want to use a more sophisticated method)
-                        if np.mean(cv2.absdiff(detected_face, cv2.resize(employee_face, detected_face.shape[:2]))) < 50:
-                            st.write(f"Matched Employee: {employee[1]}")
-                            st.write(f"Mobile: {employee[2]}, Email: {employee[3]}")
-                            st.image(employee[5], width=100)
-                            break
+      # Inside the Spitting History section where face matching is done
+for filename in os.listdir(SAVE_DIR):
+    if filename.endswith(".jpg"):
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.image(os.path.join(SAVE_DIR, filename), width=200)
+        with col2:
+            st.write(f"Detected at: {filename.split('_')[-1].split('.')[0]}")
+            
+            # Read the detected face
+            detected_face = cv2.imread(os.path.join(SAVE_DIR, filename))
+            detected_face = cv2.resize(detected_face, (224, 224))  # Resize to match dimensions
+            
+            # Fetch employee photos from the database
+            c.execute("SELECT * FROM employees")
+            employees = c.fetchall()
+
+            for employee in employees:
+                # Convert employee's photo blob back to an image
+                employee_face = cv2.imdecode(np.frombuffer(employee[5], np.uint8), cv2.IMREAD_COLOR)
+                employee_face = cv2.resize(employee_face, (224, 224))  # Resize to match dimensions
+                
+                # Ensure both images have the same number of channels (e.g., 3 for RGB)
+                if detected_face.shape[-1] != employee_face.shape[-1]:
+                    detected_face = cv2.cvtColor(detected_face, cv2.COLOR_BGR2RGB) if detected_face.shape[-1] == 3 else cv2.cvtColor(detected_face, cv2.COLOR_RGB2BGR)
+                
+                # Calculate the absolute difference
+                diff = np.mean(cv2.absdiff(detected_face, employee_face))
+
+                # Set a threshold to check if they are similar
+                if diff < 50:  # You can adjust the threshold based on accuracy needs
+                    st.write(f"Matched Employee: {employee[1]}")
+                    st.write(f"Mobile: {employee[2]}, Email: {employee[3]}")
+                    st.image(employee[5], width=100)
+                    break
+
 
 # Logout button
 if st.session_state.logged_in:
