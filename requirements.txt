@@ -4,3 +4,4 @@ opencv-python
 mtcnn
 Pillow
 numpy
+sklearn
