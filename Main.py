@@ -10,8 +10,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
 import base64
-import cv2
-
 # =====================================
 # APP CONFIGURATION
 # =====================================
@@ -28,14 +26,6 @@ st.set_page_config(
 st.markdown("""
 <style>
 /* Your custom styles here */
-.red-flash {
-    background: rgba(255, 0, 0, 0.4);
-    animation: red-flash 0.5s ease-out;
-}
-@keyframes red-flash {
-    0% { background: rgba(255, 0, 0, 0.7); }
-    100% { background: rgba(255, 0, 0, 0); }
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -218,9 +208,9 @@ def handle_employee_management(embedding_model):
                     st.image(Image.open(io.BytesIO(details['photo'])), width=150)
                 with col2:
                     st.markdown(f"""
-                    **📞 Phone:** `{details['phone']}`  
-                    **📧 Email:** `{details['email']}`  
-                    **🏠 Address:** `{details['address']}`
+                    **📞 Phone:** {details['phone']}  
+                    **📧 Email:** {details['email']}  
+                    **🏠 Address:** {details['address']}
                     """)
 
 def handle_camera_stream(spitnet_model, embedding_model):
@@ -249,64 +239,255 @@ def handle_camera_stream(spitnet_model, embedding_model):
                     prediction = spitnet_model.predict(face_array)
                     class_index = np.argmax(prediction)
                     confidence = prediction[0][class_index]
-
-                    if class_index == 0 and confidence > 0.85:
-                        st.error("🚨 Spitting Detected!", icon="🚨")
-                        st.markdown("<div class='red-flash'></div>", unsafe_allow_html=True)
-                        log_alert(embedding_model, img_array)
+                    
+                    spitting_detected = class_index == 0 and confidence > 0.7
+                    
+                    st.image(img_resized, caption="Processed Image", use_column_width=True)
+                    
+                    if spitting_detected:
+                        handle_spitting_alert(face_array, embedding_model, img_array)
                     else:
-                        st.success("✅ No spitting detected")
-                        
-                    st.image(image, caption=f"Processed Image", use_column_width=True)
+                        st.success("## ✅ All Clear: No Spitting Detected")
+
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Processing error: {str(e)}")
+
+def handle_spitting_alert(face_array, embedding_model, img_array):
+    # Red flash effect
+    st.markdown("""
+    <div class="red-flash" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999;">
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.error("## 🚨 RED ALERT: Spitting Detected!")
+
+def handle_spitting_alert(face_array, embedding_model, img_array):
+    st.balloons()
+    st.error("## 🚨 RED ALERT: Spitting Detected!")
+    
+    # Face recognition
+    current_embedding = embedding_model.predict(face_array).flatten()
+    max_sim = 0
+    matched_emp = None
+    
+    for emp_id, emp in st.session_state.employees.items():
+        similarity = cosine_similarity([current_embedding], [emp['embedding']])[0][0]
+        if similarity > max_sim:
+            max_sim = similarity
+            matched_emp = emp_id
+    
+    if max_sim > 0.6:
+        emp = st.session_state.employees[matched_emp]
+        alert = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "emp_id": matched_emp,
+            "details": emp,
+            "similarity": max_sim,
+            "image": img_array
+        }
+        if 'alerts' not in st.session_state:
+            st.session_state.alerts = []
+        st.session_state.alerts.append(alert)
+        
+        st.markdown(f"""
+        **Identified Employee:** {emp['name']} ({matched_emp})  
+        **Confidence:** {max_sim*100:.2f}%
+        """)
+    else:
+        st.warning("No matching employee found")
 
 def handle_alert_history():
-    st.markdown("## 🗂️ Alert History")
+    st.markdown("## 🚨 Incident History")
     
-    if 'alerts' not in st.session_state:
-        st.session_state.alerts = []
-    
-    if not st.session_state.alerts:
-        st.info("No alerts triggered")
+    if 'alerts' not in st.session_state or not st.session_state.alerts:
+        st.info("No alerts recorded")
     else:
-        for alert in st.session_state.alerts:
-            with st.expander(f"Alert ID: {alert['id']}"):
-                st.image(alert['photo'], width=150)
-                st.markdown(f"### Detected Person: {alert['person']}")
-                st.markdown(f"**Confidence:** `{alert['confidence']:.2f}`")
+        for alert in reversed(st.session_state.alerts):
+            with st.expander(f"Alert - {alert['timestamp']}", expanded=True):
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    st.image(alert['image'], caption="Incident Capture", width=300)
+                with col2:
+                    emp = alert['details']
+                    st.markdown(f"""
+                    **🆔 Employee ID:** {alert['emp_id']}  
+                    **👤 Name:** {emp['name']}  
+                    **📞 Phone:** {emp['phone']}  
+                    **📧 Email:** {emp['email']}  
+                    **🔍 Match Confidence:** {alert['similarity']*100:.2f}%
+                    """)
+                st.markdown("---")
+                # Add this function after the handle_alert_history function
+import base64
+import io
+from PIL import Image
+import streamlit as st
 
-def log_alert(embedding_model, img_array):
-    try:
-        img_resized = Image.fromarray(img_array).resize((224, 224))
-        face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
-        embedding = embedding_model.predict(face_array).flatten()
+# Function to generate the fine letter HTML
+def generate_fine_letter(alert):
+    emp = alert['details']
+    
+    # Convert employee photo to base64
+    employee_image = Image.open(io.BytesIO(emp['photo']))
+    buffered_employee = io.BytesIO()
+    employee_image.save(buffered_employee, format="PNG")
+    employee_img_str = base64.b64encode(buffered_employee.getvalue()).decode()
 
-        # Find matching employee
-        best_match = None
-        highest_similarity = 0
+    # Convert spitting incident photo to base64
+    incident_image = Image.fromarray(alert['image'])
+    buffered_incident = io.BytesIO()
+    incident_image.save(buffered_incident, format="PNG")
+    incident_img_str = base64.b64encode(buffered_incident.getvalue()).decode()
+    
+    # Get current date and time
+    from datetime import datetime
+    dt = datetime.strptime(alert['timestamp'], "%Y-%m-%d %H:%M:%S")
+    
+    # HTML template with improved styling
+    html_content = f"""
+    <html>
+    <head>
+    <style>
+        body {{ font-family: 'Arial', sans-serif; }}
+        .letter-container {{
+            border: 3px solid #e74c3c;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 800px;
+            margin: 20px auto;
+            background: #f9f9f9;
+        }}
+        .header {{
+            text-align: center;
+            color: #e74c3c;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }}
+        .logo {{
+            width: 180px;
+            margin-bottom: 15px;
+        }}
+        .section {{
+            margin: 25px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }}
+        .signature-box {{
+            margin-top: 40px;
+            text-align: right;
+            padding: 20px;
+            border-top: 2px dashed #e74c3c;
+        }}
+        .fine-amount {{
+            color: #e74c3c;
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            margin: 25px 0;
+        }}
+        .employee-photo {{
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            margin: 15px 0;
+        }}
+    </style>
+    </head>
+    <body>
+        <div class="letter-container">
+            <div class="header">
+                <h1>🛡️ SPITSHIELD PRO</h1>
+                <h3>Public Health Violation Notice</h3>
+            </div>
+            
+            <div class="section">
+                <h2>📅 Violation Details</h2>
+                <p><strong>Date:</strong> {dt.strftime('%d %B %Y')}</p>
+                <p><strong>Time:</strong> {dt.strftime('%I:%M %p')}</p>
+                <p><strong>Location:</strong> Main Office Premises</p>
+            </div>
 
-        for emp_id, emp_data in st.session_state.employees.items():
-            similarity = cosine_similarity([embedding], [emp_data['embedding']])
-            if similarity > highest_similarity:
-                highest_similarity = similarity
-                best_match = emp_id
+            <div class="section">
+                <h2>👤 Offender Information</h2>
+                <img src="data:image/png;base64,{employee_img_str}" class="employee-photo" width="150">
+                <p><strong>Name:</strong> {emp['name']}</p>
+                <p><strong>Employee ID:</strong> {alert['emp_id']}</p>
+                <p><strong>Contact:</strong> {emp['phone']}</p>
+            </div>
 
-        if best_match and highest_similarity > 0.7:
-            st.session_state.alerts.append({
-                "id": len(st.session_state.alerts) + 1,
-                "person": st.session_state.employees[best_match]['name'],
-                "confidence": highest_similarity,
-                "photo": Image.fromarray(img_array)
-            })
-            st.success(f"🚨 Alert: {st.session_state.employees[best_match]['name']} ({highest_similarity*100:.2f}% confidence)")
-        else:
-            st.warning("Unknown person detected")
-    except Exception as e:
-        st.error(f"Alert logging failed: {e}")
+            <div class="fine-amount">
+                ₹500 FINE IMPOSED
+            </div>
 
-# =====================================
-# RUN THE APP
-# =====================================
+            <div class="section">
+                <h2>⚖️ Violation Particulars</h2>
+                <p>Violation Code: SS-102</p>
+                <p>Article 15 of Public Health & Safety Act, 2018</p>
+                <p>Match Confidence: {alert['similarity']*100:.2f}%</p>
+                
+                <!-- Added incident proof section -->
+                <div style="margin-top: 20px;">
+                    <img src="data:image/png;base64,{incident_img_str}" 
+                         class="incident-proof"
+                         alt="Spitting Incident Proof">
+                    <p class="proof-caption">Spitting Incident Visual Proof</p>
+                </div>
+            </div>
+
+            <div class="signature-box">
+                <p>Authorized Signatory:</p>
+                <img src="https://cdn-icons-png.flaticon.com/512/1496/1496034.png" width="120">
+                <p>SpitShield Pro Enforcement Unit</p>
+                <p>Date: {datetime.now().strftime('%d %B %Y')}</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+# Update the handle_alert_history function
+def handle_alert_history():
+    st.markdown("## 🚨 Incident History")
+    
+    if 'alerts' not in st.session_state or not st.session_state.alerts:
+        st.info("No alerts recorded")
+    else:
+        for alert in reversed(st.session_state.alerts):
+            with st.expander(f"Alert - {alert['timestamp']}", expanded=True):
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    st.image(alert['image'], caption="Incident Capture", width=300)
+                with col2:
+                    emp = alert['details']
+                    st.markdown(f"""
+                    **🆔 Employee ID:** {alert['emp_id']}  
+                    **👤 Name:** {emp['name']}  
+                    **📞 Phone:** {emp['phone']}  
+                    **📧 Email:** {emp['email']}  
+                    **🔍 Match Confidence:** {alert['similarity']*100:.2f}%
+                    """)
+                    
+                    # Add download button for fine letter
+                    st.download_button(
+                        label="📄 Download Fine Notice",
+                        data=generate_fine_letter(alert).encode('utf-8'),
+                        file_name=f"fine_notice_{alert['emp_id']}_{alert['timestamp']}.html",
+                        mime="text/html",
+                        help="Download official fine notice in HTML format"
+                    )
+                st.markdown("---")
+
+
 if __name__ == "__main__":
     main()
+
