@@ -1,8 +1,6 @@
 streamlit
-opencv-python-headless
-Pillow
 tensorflow
+opencv-python
 mtcnn
+Pillow
 numpy
-face_recognition
-dlib
