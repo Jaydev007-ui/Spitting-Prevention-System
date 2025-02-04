@@ -71,10 +71,16 @@ class CustomDepthwiseConv2D(DepthwiseConv2D):
 
 @st.cache_resource
 def load_spitnet_model():
+    if not os.path.exists("keras_model.h5"):
+        st.error("Model file 'keras_model.h5' not found!")
+        return None
     try:
         model = load_model("keras_model.h5", 
                           compile=False,
                           custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
+        if model.input_shape != (None, 224, 224, 3):
+            st.error("Model input shape mismatch! Expected (224, 224, 3)")
+            return None
         return model
     except Exception as e:
         st.error(f"Model loading failed: {e}")
@@ -86,12 +92,6 @@ def load_embedding_model():
     x = GlobalAveragePooling2D()(base_model.output)
     model = Model(inputs=base_model.input, outputs=x)
     return model
-
-def detect_faces(image_array):
-    gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-    return len(faces) > 0
 
 # =====================================
 # MAIN APP
@@ -208,9 +208,9 @@ def handle_employee_management(embedding_model):
                     st.image(Image.open(io.BytesIO(details['photo'])), width=150)
                 with col2:
                     st.markdown(f"""
-                    **📞 Phone:** {details['phone']}  
-                    **📧 Email:** {details['email']}  
-                    **🏠 Address:** {details['address']}
+                    **📞 Phone:** `{details['phone']}`  
+                    **📧 Email:** `{details['email']}`  
+                    **🏠 Address:** `{details['address']}`
                     """)
 
 def handle_camera_stream(spitnet_model, embedding_model):
@@ -225,12 +225,7 @@ def handle_camera_stream(spitnet_model, embedding_model):
                     image = Image.open(uploaded_image).convert('RGB')
                     img_array = np.array(image)
                     
-                    # Face detection check
-                    if not detect_faces(img_array):
-                        st.warning("## 👤 No Human Detected")
-                        return
-
-                    # Resize image
+                    # Resize image to 224x224
                     img_resized = Image.fromarray(img_array).resize((224, 224))
                     img_array = np.array(img_resized)
                     
@@ -242,6 +237,7 @@ def handle_camera_stream(spitnet_model, embedding_model):
                     
                     spitting_detected = class_index == 0 and confidence > 0.7
                     
+                    # Display results
                     st.image(img_resized, caption="Processed Image", use_column_width=True)
                     
                     if spitting_detected:
@@ -251,22 +247,6 @@ def handle_camera_stream(spitnet_model, embedding_model):
 
                 except Exception as e:
                     st.error(f"Processing error: {str(e)}")
-
-def handle_spitting_alert(face_array, embedding_model, img_array):
-    # Red flash effect
-    st.markdown("""
-    <div class="red-flash" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 9999;">
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.error("## 🚨 RED ALERT: Spitting Detected!")
 
 def handle_spitting_alert(face_array, embedding_model, img_array):
     st.balloons()
@@ -317,11 +297,11 @@ def handle_alert_history():
                 with col2:
                     emp = alert['details']
                     st.markdown(f"""
-                    **🆔 Employee ID:** {alert['emp_id']}  
-                    **👤 Name:** {emp['name']}  
-                    **📞 Phone:** {emp['phone']}  
-                    **📧 Email:** {emp['email']}  
-                    **🔍 Match Confidence:** {alert['similarity']*100:.2f}%
+                    **🆔 Employee ID:** `{alert['emp_id']}`  
+                    **👤 Name:** `{emp['name']}`  
+                    **📞 Phone:** `{emp['phone']}`  
+                    **📧 Email:** `{emp['email']}`  
+                    **🔍 Match Confidence:** `{alert['similarity']*100:.2f}%`
                     """)
                 st.markdown("---")
                 # Add this function after the handle_alert_history function
@@ -470,11 +450,11 @@ def handle_alert_history():
                 with col2:
                     emp = alert['details']
                     st.markdown(f"""
-                    **🆔 Employee ID:** {alert['emp_id']}  
-                    **👤 Name:** {emp['name']}  
-                    **📞 Phone:** {emp['phone']}  
-                    **📧 Email:** {emp['email']}  
-                    **🔍 Match Confidence:** {alert['similarity']*100:.2f}%
+                    **🆔 Employee ID:** `{alert['emp_id']}`  
+                    **👤 Name:** `{emp['name']}`  
+                    **📞 Phone:** `{emp['phone']}`  
+                    **📧 Email:** `{emp['email']}`  
+                    **🔍 Match Confidence:** `{alert['similarity']*100:.2f}%`
                     """)
                     
                     # Add download button for fine letter
@@ -490,4 +470,3 @@ def handle_alert_history():
 
 if __name__ == "__main__":
     main()
-
