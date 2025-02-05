@@ -1,9 +1,8 @@
 streamlit
-tensorflow
-opencv-python
-mtcnn
-Pillow
-numpy
-scikit-learn
-opencv-python-headless
 streamlit-webrtc
+opencv-python-headless
+tensorflow
+scikit-learn
+numpy
+pillow
+av
