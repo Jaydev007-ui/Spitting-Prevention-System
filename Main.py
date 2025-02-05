@@ -1,5 +1,6 @@
 import os
 import io
+import queue
 import streamlit as st
 import numpy as np
 import cv2
@@ -63,6 +64,7 @@ class VideoTransformer(VideoProcessorBase):
     def __init__(self, spitnet_model, embedding_model):
         self.spitnet_model = spitnet_model
         self.embedding_model = embedding_model
+        self.alerts = []
 
     def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
@@ -77,19 +79,11 @@ class VideoTransformer(VideoProcessorBase):
         spitting_detected = class_index == 0 and confidence > 0.7
         
         if spitting_detected:
-            # Handle spitting alert
             self.handle_spitting_alert(face_array, img)
-        
-        # Log the frame processing
-        st.write("Frame processed")
         
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
     def handle_spitting_alert(self, face_array, img_array):
-        st.balloons()
-        st.error("## 🚨 RED ALERT: Spitting Detected!")
-        
-        # Face recognition
         current_embedding = self.embedding_model.predict(face_array).flatten()
         max_sim = 0
         matched_emp = None
@@ -100,25 +94,13 @@ class VideoTransformer(VideoProcessorBase):
                 max_sim = similarity
                 matched_emp = emp_id
         
-        if max_sim > 0.6:
-            emp = st.session_state.employees[matched_emp]
-            alert = {
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "emp_id": matched_emp,
-                "details": emp,
-                "similarity": max_sim,
-                "image": img_array
-            }
-            if 'alerts' not in st.session_state:
-                st.session_state.alerts = []
-            st.session_state.alerts.append(alert)
-            
-            st.markdown(f"""
-            **Identified Employee:** {emp['name']} ({matched_emp})  
-            **Confidence:** {max_sim*100:.2f}%
-            """)
-        else:
-            st.warning("No matching employee found")
+        alert_data = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "image": img_array,
+            "max_sim": max_sim,
+            "matched_emp": matched_emp
+        }
+        self.alerts.append(alert_data)
 
 def main():
     spitnet_model = load_spitnet_model()
@@ -129,14 +111,19 @@ def main():
 
     st.markdown("## 🛡️ SPITTING PREVENTION SYSTEM")
 
+    # Initialize session state variables
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+    if 'employees' not in st.session_state:
+        st.session_state.employees = {}
+    if 'alerts' not in st.session_state:
+        st.session_state.alerts = []
+
     # Sidebar Authentication
     with st.sidebar:
         st.image("https://cdn-icons-png.flaticon.com/512/681/681494.png", width=100)
         st.markdown("### 🔐 System Control Panel")
         
-        if 'logged_in' not in st.session_state:
-            st.session_state.logged_in = False
-            
         if not st.session_state.logged_in:
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
@@ -169,9 +156,6 @@ def main():
 def handle_employee_management(embedding_model):
     st.markdown("## 👥 Employee Management")
     
-    if 'employees' not in st.session_state:
-        st.session_state.employees = {}
-    
     with st.form("employee_form", clear_on_submit=True):
         col1, col2 = st.columns([2, 1])
         with col1:
@@ -196,7 +180,6 @@ def handle_employee_management(embedding_model):
                     img_resized = img.resize((224, 224))
                     img_array = np.array(img_resized)
                     
-                    # Generate embedding
                     face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
                     embedding = embedding_model.predict(face_array).flatten()
                     
@@ -233,7 +216,6 @@ def handle_employee_management(embedding_model):
 def handle_camera_stream(spitnet_model, embedding_model):
     st.markdown("## 📡 Live Monitoring")
     
-    # Option to use webcam
     use_webcam = st.radio("Select Input Source", ["Upload CCTV Snapshot", "Use Webcam"])
     
     if use_webcam == "Use Webcam":
@@ -247,13 +229,36 @@ def handle_camera_stream(spitnet_model, embedding_model):
             media_stream_constraints={"video": True, "audio": False},
         )
         
-        if webrtc_ctx.video_processor:
-            st.write("Webcam is running. Look at the video stream.")
-            if st.button("Stop Webcam"):
-                webrtc_ctx.stop()
-                st.write("Webcam has been stopped.")
-        else:
-            st.error("Webcam is not available. Please check your camera settings.")
+        if webrtc_ctx and webrtc_ctx.video_processor:
+            video_processor = webrtc_ctx.video_processor
+            if hasattr(video_processor, 'alerts') and video_processor.alerts:
+                for alert_data in video_processor.alerts:
+                    emp_id = alert_data.get("matched_emp")
+                    max_sim = alert_data.get("max_sim")
+                    img_array = alert_data.get("image")
+                    timestamp = alert_data.get("timestamp")
+                    
+                    st.balloons()
+                    st.error("## 🚨 RED ALERT: Spitting Detected!")
+                    
+                    if max_sim > 0.6 and emp_id in st.session_state.employees:
+                        emp = st.session_state.employees[emp_id]
+                        alert = {
+                            "timestamp": timestamp,
+                            "emp_id": emp_id,
+                            "details": emp,
+                            "similarity": max_sim,
+                            "image": img_array
+                        }
+                        st.session_state.alerts.append(alert)
+                        st.markdown(f"""
+                        **Identified Employee:** {emp['name']} ({emp_id})  
+                        **Confidence:** {max_sim*100:.2f}%
+                        """)
+                    else:
+                        st.warning("No matching employee found")
+                
+                video_processor.alerts.clear()
     else:
         uploaded_image = st.file_uploader("Upload CCTV Snapshot", type=["jpg", "jpeg", "png"])
         
@@ -265,11 +270,9 @@ def handle_camera_stream(spitnet_model, embedding_model):
                         image = Image.open(uploaded_image).convert('RGB')
                         img_array = np.array(image)
                         
-                        # Resize image to 224x224
                         img_resized = Image.fromarray(img_array).resize((224, 224))
                         img_array = np.array(img_resized)
                         
-                        # Spit detection
                         face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
                         prediction = spitnet_model.predict(face_array)
                         class_index = np.argmax(prediction)
@@ -277,7 +280,6 @@ def handle_camera_stream(spitnet_model, embedding_model):
                         
                         spitting_detected = class_index == 0 and confidence > 0.7
                         
-                        # Display results
                         st.image(img_resized, caption="Processed Image", use_column_width=True)
                         
                         if spitting_detected:
@@ -292,7 +294,6 @@ def handle_spitting_alert(face_array, embedding_model, img_array):
     st.balloons()
     st.error("## 🚨 RED ALERT: Spitting Detected!")
     
-    # Face recognition
     current_embedding = embedding_model.predict(face_array).flatten()
     max_sim = 0
     matched_emp = None
@@ -303,7 +304,7 @@ def handle_spitting_alert(face_array, embedding_model, img_array):
             max_sim = similarity
             matched_emp = emp_id
     
-    if max_sim > 0.6:
+    if max_sim > 0.6 and matched_emp:
         emp = st.session_state.employees[matched_emp]
         alert = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -312,10 +313,7 @@ def handle_spitting_alert(face_array, embedding_model, img_array):
             "similarity": max_sim,
             "image": img_array
         }
-        if 'alerts' not in st.session_state:
-            st.session_state.alerts = []
         st.session_state.alerts.append(alert)
-        
         st.markdown(f"""
         **Identified Employee:** {emp['name']} ({matched_emp})  
         **Confidence:** {max_sim*100:.2f}%
@@ -326,7 +324,7 @@ def handle_spitting_alert(face_array, embedding_model, img_array):
 def handle_alert_history():
     st.markdown("## 🚨 Incident History")
     
-    if 'alerts' not in st.session_state or not st.session_state.alerts:
+    if not st.session_state.alerts:
         st.info("No alerts recorded")
     else:
         for alert in reversed(st.session_state.alerts):
