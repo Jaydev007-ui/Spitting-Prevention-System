@@ -249,10 +249,11 @@ def handle_camera_stream(spitnet_model, embedding_model):
         
         if webrtc_ctx.video_processor:
             st.write("Webcam is running. Look at the video stream.")
-            # Allow the user to stop the webcam manually
             if st.button("Stop Webcam"):
                 webrtc_ctx.stop()
                 st.write("Webcam has been stopped.")
+        else:
+            st.error("Webcam is not available. Please check your camera settings.")
     else:
         uploaded_image = st.file_uploader("Upload CCTV Snapshot", type=["jpg", "jpeg", "png"])
         
