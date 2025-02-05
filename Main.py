@@ -10,9 +10,8 @@ import time
 from sklearn.metrics.pairwise import cosine_similarity
 from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
-import base64
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 import av
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
 # =====================================
 # APP CONFIGURATION
@@ -23,47 +22,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# =====================================
-# CUSTOM STYLES
-# =====================================
-st.markdown("""
-<style>
-/* Your custom styles here */
-</style>
-""", unsafe_allow_html=True)
-
-# =====================================
-# CUSTOM COMPONENTS
-# =====================================
-def gradient_text(text):
-    return f"""
-    <h1 style="
-        background: linear-gradient(45deg, #FF4B4B, #FF0000);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-family: 'Arial Black';
-        text-align: center;
-    ">
-        {text}
-    </h1>
-    """
-
-def status_badge(status):
-    color = "#00FF00" if status else "#FF0000"
-    return f"""
-    <div style="
-        display: inline-block;
-        padding: 5px 15px;
-        background: {color};
-        color: black;
-        border-radius: 20px;
-        font-weight: bold;
-        box-shadow: 0 0 10px {color};
-    ">
-        {'🟢 ACTIVE' if status else '🔴 OFFLINE'}
-    </div>
-    """
 
 # =====================================
 # MODEL LOADING
@@ -121,6 +79,9 @@ class VideoTransformer(VideoProcessorBase):
             # Handle spitting alert
             self.handle_spitting_alert(face_array, img)
         
+        # Log the frame processing
+        st.write("Frame processed")
+        
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
     def handle_spitting_alert(self, face_array, img_array):
@@ -165,14 +126,7 @@ def main():
     if not spitnet_model:
         return
 
-    st.markdown(gradient_text("🛡️ SPITTING PREVENTION SYSTEM"), unsafe_allow_html=True)
-    
-    st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 30px;">
-        {status_badge(True)}
-        <div style="margin-top: 10px; color: #888;">v1.0 | AI-Powered Spit Detection</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("## 🛡️ SPITTING PREVENTION SYSTEM")
 
     # Sidebar Authentication
     with st.sidebar:
@@ -387,4 +341,3 @@ def handle_alert_history():
 
 if __name__ == "__main__":
     main()
-
