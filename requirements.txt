@@ -6,3 +6,4 @@ Pillow
 numpy
 scikit-learn
 opencv-python-headless
+streamlit-webrtc
