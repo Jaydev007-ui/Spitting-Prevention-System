@@ -25,6 +25,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Load Haar Cascade for face detection
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
 # =====================================
 # MODEL LOADING
 # =====================================
@@ -65,23 +68,42 @@ class VideoTransformer(VideoProcessorBase):
         self.spitnet_model = spitnet_model
         self.embedding_model = embedding_model
         self.alerts = []
+        self.frame_count = 0  # Frame counter
 
     def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
-        img_resized = cv2.resize(img, (224, 224))
-        
-        # Spit detection
-        face_array = np.expand_dims(img_resized, axis=0).astype('float32') / 127.5 - 1
-        prediction = self.spitnet_model.predict(face_array)
-        class_index = np.argmax(prediction)
-        confidence = prediction[0][class_index]
-        
-        spitting_detected = class_index == 0 and confidence > 0.7
-        
-        if spitting_detected:
-            self.handle_spitting_alert(face_array, img)
-        
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
+        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Resize the image to reduce processing load
+        img_resized = cv2.resize(img, (320, 240))  # Resize to 320x240 for faster processing
+        img_gray_resized = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+
+        # Face detection
+        faces = face_cascade.detectMultiScale(img_gray_resized, scaleFactor=1.1, minNeighbors=5)
+
+        # Process every nth frame to reduce load
+        self.frame_count += 1
+        if self.frame_count % 5 == 0:  # Process every 5th frame
+            for (x, y, w, h) in faces:
+                cv2.rectangle(img_resized, (x, y), (x + w, y + h), (255, 0, 0), 2)  # Draw rectangle around face
+                face_roi = img_resized[y:y + h, x:x + w]
+                img_face_resized = cv2.resize(face_roi, (224, 224))
+
+                # Spit detection
+                face_array = np.expand_dims(img_face_resized, axis=0).astype('float32') / 127.5 - 1
+                prediction = self.spitnet_model.predict(face_array)
+                class_index = np.argmax(prediction)
+                confidence = prediction[0][class_index]
+
+                # Debugging output
+                st.write(f"Class Index: {class_index}, Confidence: {confidence}")  # Debugging output
+
+                spitting_detected = class_index == 0 and confidence > 0.5  # Lowered threshold for testing
+
+                if spitting_detected:
+                    self.handle_spitting_alert(face_array, img_resized)
+
+        return av.VideoFrame.from_ndarray(img_resized, format="bgr24")
 
     def handle_spitting_alert(self, face_array, img_array):
         current_embedding = self.embedding_model.predict(face_array).flatten()
@@ -278,7 +300,7 @@ def handle_camera_stream(spitnet_model, embedding_model):
                         class_index = np.argmax(prediction)
                         confidence = prediction[0][class_index]
                         
-                        spitting_detected = class_index == 0 and confidence > 0.7
+                        spitting_detected = class_index == 0 and confidence > 0.5  # Lowered threshold for testing
                         
                         st.image(img_resized, caption="Processed Image", use_column_width=True)
                         
