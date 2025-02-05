@@ -83,7 +83,7 @@ class VideoTransformer(VideoProcessorBase):
 
         # Process every nth frame to reduce load
         self.frame_count += 1
-        if self.frame_count % 5 == 0:  # Process every 5th frame
+        if self.frame_count % 10 == 0:  # Process every 10th frame
             for (x, y, w, h) in faces:
                 cv2.rectangle(img_resized, (x, y), (x + w, y + h), (255, 0, 0), 2)  # Draw rectangle around face
                 face_roi = img_resized[y:y + h, x:x + w]
