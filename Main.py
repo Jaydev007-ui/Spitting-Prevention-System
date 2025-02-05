@@ -11,7 +11,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
 import base64
-from streamlit_webrtc import VideoTransformerBase, webrtc_streamer
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
+import av
 
 # =====================================
 # APP CONFIGURATION
@@ -99,14 +100,14 @@ def load_embedding_model():
 # =====================================
 # MAIN APP
 # =====================================
-class VideoTransformer(VideoTransformerBase):
+class VideoTransformer(VideoProcessorBase):
     def __init__(self, spitnet_model, embedding_model):
         self.spitnet_model = spitnet_model
         self.embedding_model = embedding_model
 
-    def transform(self, frame):
-        img_array = frame.to_ndarray(format="bgr24")
-        img_resized = cv2.resize(img_array, (224, 224))
+    def recv(self, frame):
+        img = frame.to_ndarray(format="bgr24")
+        img_resized = cv2.resize(img, (224, 224))
         
         # Spit detection
         face_array = np.expand_dims(img_resized, axis=0).astype('float32') / 127.5 - 1
@@ -118,9 +119,9 @@ class VideoTransformer(VideoTransformerBase):
         
         if spitting_detected:
             # Handle spitting alert
-            self.handle_spitting_alert(face_array, img_array)
+            self.handle_spitting_alert(face_array, img)
         
-        return img_array
+        return av.VideoFrame.from_ndarray(img, format="bgr24")
 
     def handle_spitting_alert(self, face_array, img_array):
         st.balloons()
@@ -282,7 +283,17 @@ def handle_camera_stream(spitnet_model, embedding_model):
     
     if use_webcam == "Use Webcam":
         st.write("### Webcam Feed")
-        webrtc_streamer(key="example", video_transformer=VideoTransformer(spitnet_model, embedding_model), width=640, height=480)
+        webrtc_ctx = webrtc_streamer(
+            key="example",
+            video_processor_factory=lambda: VideoTransformer(spitnet_model, embedding_model),
+            rtc_configuration=RTCConfiguration(
+                {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+            ),
+            media_stream_constraints={"video": True, "audio": False},
+        )
+        
+        if webrtc_ctx.video_processor:
+            st.write("Webcam is running. Look at the video stream.")
     else:
         uploaded_image = st.file_uploader("Upload CCTV Snapshot", type=["jpg", "jpeg", "png"])
         
@@ -376,3 +387,4 @@ def handle_alert_history():
 
 if __name__ == "__main__":
     main()
+
