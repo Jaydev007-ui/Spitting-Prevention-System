@@ -1,17 +1,16 @@
+import streamlit as st
+import cv2
+import numpy as np
+import requests
 import os
 import io
-import queue
-import streamlit as st
-import numpy as np
-import cv2
+import time
+from sklearn.metrics.pairwise import cosine_similarity
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import DepthwiseConv2D, GlobalAveragePooling2D
 from PIL import Image
-import time
-from sklearn.metrics.pairwise import cosine_similarity
 from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
-import av
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
 # =====================================
@@ -237,106 +236,35 @@ def handle_employee_management(embedding_model):
 def handle_camera_stream(spitnet_model, embedding_model):
     st.markdown("## 📡 Live Monitoring")
     
-    ip_camera_url = st.text_input("Enter IP Camera URL", placeholder="rtsp://username:password@ip_address:port/path")
+    flask_stream_url = st.text_input("Enter Flask Stream URL", placeholder="http://<raspberry_pi_ip>:5000/video_feed")
     
     if st.button("Start Stream"):
-        if not ip_camera_url:
-            st.error("Please enter a valid IP camera URL.")
+        if not flask_stream_url:
+            st.error("Please enter a valid Flask stream URL.")
             return
         
-        st.write("### IP Camera Feed")
-        webrtc_ctx = webrtc_streamer(
-            key="example",
-            video_processor_factory=lambda: VideoTransformer(spitnet_model, embedding_model),
-            rtc_configuration=RTCConfiguration(
-                {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-            ),
-            media_stream_constraints={"video": True, "audio": False},
-        )
-        
-        # Open the video stream from the IP camera
-        cap = cv2.VideoCapture(ip_camera_url)
-        if not cap.isOpened():
-            st.error("Failed to open the video stream. Please check the URL.")
-            return
-        
+        st.write("### Video Feed")
+        video_placeholder = st.empty()
+
+        # Start capturing the video stream
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Failed to read frame from the camera.")
+            try:
+                response = requests.get(flask_stream_url, stream=True)
+                bytes_data = b''
+                for chunk in response.iter_content(chunk_size=1024):
+                    bytes_data += chunk
+                    a = bytes_data.find(b'\xff\xd8')  # JPEG start
+                    b = bytes_data.find(b'\xff\xd9')  # JPEG end
+                    if a != -1 and b != -1:
+                        jpg = bytes_data[a:b + 2]  # Extract the JPEG image
+                        bytes_data = bytes_data[b + 2:]  # Remove the processed bytes
+                        # Convert the JPEG image to a NumPy array
+                        img = cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR)
+                        # Display the image in Streamlit
+                        video_placeholder.image(img, channels="BGR")
+            except Exception as e:
+                st.error(f"Error accessing the stream: {e}")
                 break
-            
-            # Process the frame
-            img_resized = cv2.resize(frame, (320, 240))
-            img_frame = av.VideoFrame.from_ndarray(img_resized, format="bgr24")
-            webrtc_ctx.video_processor.recv(img_frame)
-
-        cap.release()
-
-    # Add image upload option below the IP camera stream option
-    st.markdown("---")
-    st.markdown("## 📸 Upload Image for Spitting Detection")
-    
-    uploaded_image = st.file_uploader("Upload an image for spitting detection", type=["jpg", "jpeg", "png"])
-    
-    if uploaded_image:
-        col1, col2 = st.columns(2)
-        with col1:
-            with st.spinner("🔍 Analyzing..."):
-                try:
-                    image = Image.open(uploaded_image).convert('RGB')
-                    img_array = np.array(image)
-                    
-                    img_resized = Image.fromarray(img_array).resize((224, 224))
-                    img_array = np.array(img_resized)
-                    
-                    face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
-                    prediction = spitnet_model.predict(face_array)
-                    class_index = np.argmax(prediction)
-                    confidence = prediction[0][class_index]
-                    
-                    spitting_detected = class_index == 0 and confidence > 0.5  # Lowered threshold for testing
-                    
-                    st.image(img_resized, caption="Processed Image", use_column_width=True)
-                    
-                    if spitting_detected:
-                        handle_spitting_alert(face_array, embedding_model, img_array)
-                    else:
-                        st.success("## ✅ All Clear: No Spitting Detected")
-
-                except Exception as e:
-                    st.error(f"Processing error: {str(e)}")
-
-def handle_spitting_alert(face_array, embedding_model, img_array):
-    st.balloons()
-    st.error("## 🚨 RED ALERT: Spitting Detected!")
-    
-    current_embedding = embedding_model.predict(face_array).flatten()
-    max_sim = 0
-    matched_emp = None
-    
-    for emp_id, emp in st.session_state.employees.items():
-        similarity = cosine_similarity([current_embedding], [emp['embedding']])[0][0]
-        if similarity > max_sim:
-            max_sim = similarity
-            matched_emp = emp_id
-    
-    if max_sim > 0.6 and matched_emp:
-        emp = st.session_state.employees[matched_emp]
-        alert = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "emp_id": matched_emp,
-            "details": emp,
-            "similarity": max_sim,
-            "image": img_array
-        }
-        st.session_state.alerts.append(alert)
-        st.markdown(f"""
-        **Identified Employee:** {emp['name']} ({matched_emp})  
-        **Confidence:** {max_sim*100:.2f}%
-        """)
-    else:
-        st.warning("No matching employee found")
 
 def handle_alert_history():
     st.markdown("## 🚨 Incident History")
