@@ -11,6 +11,7 @@ from tensorflow.keras.layers import DepthwiseConv2D, GlobalAveragePooling2D
 from PIL import Image
 from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
+from fpdf import FPDF  # Import FPDF for PDF generation
 
 # =====================================
 # APP CONFIGURATION
@@ -237,8 +238,42 @@ def handle_spitting_alert(face_array, embedding_model, img_array):
         **Identified Employee:** {emp['name']} ({matched_emp})  
         **Confidence:** {max_sim*100:.2f}%
         """)
+        
+        # Generate fine letter
+        if st.button("📄 Generate Fine Letter"):
+            generate_fine_letter(emp, alert)
+
     else:
         st.warning("No matching employee found")
+
+def generate_fine_letter(emp, alert):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    # Add content to the PDF
+    pdf.cell(200, 10, txt="Fine Letter", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"Date: {alert['timestamp']}", ln=True)
+    pdf.cell(200, 10, txt=f"Employee ID: {alert['emp_id']}", ln=True)
+    pdf.cell(200, 10, txt=f"Name: {emp['name']}", ln=True)
+    pdf.cell(200, 10, txt=f"Phone: {emp['phone']}", ln=True)
+    pdf.cell(200, 10, txt=f"Email: {emp['email']}", ln=True)
+    pdf.cell(200, 10, txt=f"Address: {emp['address']}", ln=True)
+    pdf.cell(200, 10, txt="This is to inform you that spitting has been detected.", ln=True)
+    pdf.cell(200, 10, txt="Please adhere to the company's hygiene policies.", ln=True)
+
+    # Save the PDF to a BytesIO object
+    pdf_output = io.BytesIO()
+    pdf.output(pdf_output)
+    pdf_output.seek(0)
+
+    # Provide a download link for the PDF
+    st.download_button(
+        label="Download Fine Letter",
+        data=pdf_output,
+        file_name=f"fine_letter_{alert['emp_id']}.pdf",
+        mime="application/pdf"
+    )
 
 def handle_alert_history():
     st.markdown("## 🚨 Incident History")
