@@ -174,7 +174,7 @@ def handle_camera_stream(spitnet_model, embedding_model):
     st.markdown("## 📡 Live Monitoring")
     
     # Edit your Flask stream URL here
-    flask_stream_url = "http://<raspberry_pi_ip>:5000/video_feed"
+    flask_stream_url = "http://192.168.94.30:5000/video_feed"
     
     # Button to visit live stream page
     if st.button("Visit Live Stream"):
