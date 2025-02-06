@@ -273,60 +273,8 @@ def handle_camera_stream(spitnet_model, embedding_model):
 
         cap.release()
 
-def handle_spitting_alert(face_array, embedding_model, img_array):
-    st.balloons()
-    st.error("## 🚨 RED ALERT: Spitting Detected!")
-    
-    current_embedding = embedding_model.predict(face_array).flatten()
-    max_sim = 0
-    matched_emp = None
-    
-    for emp_id, emp in st.session_state.employees.items():
-        similarity = cosine_similarity([current_embedding], [emp['embedding']])[0][0]
-        if similarity > max_sim:
-            max_sim = similarity
-            matched_emp = emp_id
-    
-    if max_sim > 0.6 and matched_emp:
-        emp = st.session_state.employees[matched_emp]
-        alert = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "emp_id": matched_emp,
-            "details": emp,
-            "similarity": max_sim,
-            "image": img_array
-        }
-        st.session_state.alerts.append(alert)
-        st.markdown(f"""
-        **Identified Employee:** {emp['name']} ({matched_emp})  
-        **Confidence:** {max_sim*100:.2f}%
-        """)
-    else:
-        st.warning("No matching employee found")
-
-def handle_alert_history():
-    st.markdown("## 🚨 Incident History")
-    
-    if not st.session_state.alerts:
-        st.info("No alerts recorded")
-    else:
-        for alert in reversed(st.session_state.alerts):
-            with st.expander(f"Alert - {alert['timestamp']}", expanded=True):
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.image(alert['image'], caption="Incident Capture", width=300)
-                with col2:
-                    emp = alert['details']
-                    st.markdown(f"""
-                    **🆔 Employee ID:** {alert['emp_id']}  
-                    **👤 Name:** {emp['name']}  
-                    **📞 Phone:** {emp['phone']}  
-                    **📧 Email:** {emp['email']}  
-                    **🔍 Match Confidence:** {alert['similarity']*100:.2f}%
-                    """)
-                st.markdown("---")
-
-def handle_image_upload_for_detection(spitnet_model, embedding_model):
+    # Add image upload option below the IP camera stream option
+    st.markdown("---")
     st.markdown("## 📸 Upload Image for Spitting Detection")
     
     uploaded_image = st.file_uploader("Upload an image for spitting detection", type=["jpg", "jpeg", "png"])
@@ -359,44 +307,36 @@ def handle_image_upload_for_detection(spitnet_model, embedding_model):
                 except Exception as e:
                     st.error(f"Processing error: {str(e)}")
 
-def handle_camera_stream(spitnet_model, embedding_model):
-    st.markdown("## 📡 Live Monitoring")
+def handle_spitting_alert(face_array, embedding_model, img_array):
+    st.balloons()
+    st.error("## 🚨 RED ALERT: Spitting Detected!")
     
-    ip_camera_url = st.text_input("Enter IP Camera URL", placeholder="rtsp://username:password@ip_address:port/path")
+    current_embedding = embedding_model.predict(face_array).flatten()
+    max_sim = 0
+    matched_emp = None
     
-    if st.button("Start Stream"):
-        if not ip_camera_url:
-            st.error("Please enter a valid IP camera URL.")
-            return
-        
-        st.write("### IP Camera Feed")
-        webrtc_ctx = webrtc_streamer(
-            key="example",
-            video_processor_factory=lambda: VideoTransformer(spitnet_model, embedding_model),
-            rtc_configuration=RTCConfiguration(
-                {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-            ),
-            media_stream_constraints={"video": True, "audio": False},
-        )
-        
-        # Open the video stream from the IP camera
-        cap = cv2.VideoCapture(ip_camera_url)
-        if not cap.isOpened():
-            st.error("Failed to open the video stream. Please check the URL.")
-            return
-        
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Failed to read frame from the camera.")
-                break
-            
-            # Process the frame
-            img_resized = cv2.resize(frame, (320, 240))
-            img_frame = av.VideoFrame.from_ndarray(img_resized, format="bgr24")
-            webrtc_ctx.video_processor.recv(img_frame)
-
-        cap.release()
+    for emp_id, emp in st.session_state.employees.items():
+        similarity = cosine_similarity([current_embedding], [emp['embedding']])[0][0]
+        if similarity > max_sim:
+            max_sim = similarity
+            matched_emp = emp_id
+    
+    if max_sim > 0.6 and matched_emp:
+        emp = st.session_state.employees[matched_emp]
+        alert = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "emp_id": matched_emp,
+            "details": emp,
+            "similarity": max_sim,
+            "image": img_array
+        }
+        st.session_state.alerts.append(alert)
+        st.markdown(f"""
+        **Identified Employee:** {emp['name']} ({matched_emp})  
+        **Confidence:** {max_sim*100:.2f}%
+        """)
+    else:
+        st.warning("No matching employee found")
 
 def handle_alert_history():
     st.markdown("## 🚨 Incident History")
