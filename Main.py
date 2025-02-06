@@ -229,141 +229,39 @@ def handle_employee_management(embedding_model):
                 with col1:
                     st.image(Image.open(io.BytesIO(details['photo'])), width=150)
                 with col2:
-                    st.markdown(f"""
-                    **📞 Phone:** {details['phone']}  
-                    **📧 Email:** {details['email']}  
-                    **🏠 Address:** {details['address']}
-                    """)
+                    st.write(f"**Phone:** {details['phone']}")
+                    st.write(f"**Email:** {details['email']}")
+                    st.write(f"**Address:** {details['address']}")
+                    if st.button(f"❌ Remove {emp_id}", key=f"remove_{emp_id}"):
+                        del st.session_state.employees[emp_id]
+                        st.success(f"Employee {emp_id} removed successfully")
+                        st.rerun()
 
 def handle_camera_stream(spitnet_model, embedding_model):
-    st.markdown("## 📡 Live Monitoring")
+    st.markdown("## 📷 Live Camera Stream")
     
-    use_webcam = st.radio("Select Input Source", ["Upload CCTV Snapshot", "Use Webcam"])
-    
-    if use_webcam == "Use Webcam":
-        st.write("### Webcam Feed")
-        webrtc_ctx = webrtc_streamer(
-            key="example",
-            video_processor_factory=lambda: VideoTransformer(spitnet_model, embedding_model),
-            rtc_configuration=RTCConfiguration(
-                {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-            ),
-            media_stream_constraints={"video": True, "audio": False},
-        )
-        
-        if webrtc_ctx and webrtc_ctx.video_processor:
-            video_processor = webrtc_ctx.video_processor
-            if hasattr(video_processor, 'alerts') and video_processor.alerts:
-                for alert_data in video_processor.alerts:
-                    emp_id = alert_data.get("matched_emp")
-                    max_sim = alert_data.get("max_sim")
-                    img_array = alert_data.get("image")
-                    timestamp = alert_data.get("timestamp")
-                    
-                    st.balloons()
-                    st.error("## 🚨 RED ALERT: Spitting Detected!")
-                    
-                    if max_sim > 0.6 and emp_id in st.session_state.employees:
-                        emp = st.session_state.employees[emp_id]
-                        alert = {
-                            "timestamp": timestamp,
-                            "emp_id": emp_id,
-                            "details": emp,
-                            "similarity": max_sim,
-                            "image": img_array
-                        }
-                        st.session_state.alerts.append(alert)
-                        st.markdown(f"""
-                        **Identified Employee:** {emp['name']} ({emp_id})  
-                        **Confidence:** {max_sim*100:.2f}%
-                        """)
-                    else:
-                        st.warning("No matching employee found")
-                
-                video_processor.alerts.clear()
-    else:
-        uploaded_image = st.file_uploader("Upload CCTV Snapshot", type=["jpg", "jpeg", "png"])
-        
-        if uploaded_image:
-            col1, col2 = st.columns(2)
-            with col1:
-                with st.spinner("🔍 Analyzing..."):
-                    try:
-                        image = Image.open(uploaded_image).convert('RGB')
-                        img_array = np.array(image)
-                        
-                        img_resized = Image.fromarray(img_array).resize((224, 224))
-                        img_array = np.array(img_resized)
-                        
-                        face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
-                        prediction = spitnet_model.predict(face_array)
-                        class_index = np.argmax(prediction)
-                        confidence = prediction[0][class_index]
-                        
-                        spitting_detected = class_index == 0 and confidence > 0.5  # Lowered threshold for testing
-                        
-                        st.image(img_resized, caption="Processed Image", use_column_width=True)
-                        
-                        if spitting_detected:
-                            handle_spitting_alert(face_array, embedding_model, img_array)
-                        else:
-                            st.success("## ✅ All Clear: No Spitting Detected")
-
-                    except Exception as e:
-                        st.error(f"Processing error: {str(e)}")
-
-def handle_spitting_alert(face_array, embedding_model, img_array):
-    st.balloons()
-    st.error("## 🚨 RED ALERT: Spitting Detected!")
-    
-    current_embedding = embedding_model.predict(face_array).flatten()
-    max_sim = 0
-    matched_emp = None
-    
-    for emp_id, emp in st.session_state.employees.items():
-        similarity = cosine_similarity([current_embedding], [emp['embedding']])[0][0]
-        if similarity > max_sim:
-            max_sim = similarity
-            matched_emp = emp_id
-    
-    if max_sim > 0.6 and matched_emp:
-        emp = st.session_state.employees[matched_emp]
-        alert = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "emp_id": matched_emp,
-            "details": emp,
-            "similarity": max_sim,
-            "image": img_array
-        }
-        st.session_state.alerts.append(alert)
-        st.markdown(f"""
-        **Identified Employee:** {emp['name']} ({matched_emp})  
-        **Confidence:** {max_sim*100:.2f}%
-        """)
-    else:
-        st.warning("No matching employee found")
+    webrtc_streamer(
+        key="spit-prevention-stream",
+        video_processor_factory=lambda: VideoTransformer(spitnet_model, embedding_model),
+        rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
+        media_stream_constraints={"video": True, "audio": False},
+        async_processing=True
+    )
 
 def handle_alert_history():
-    st.markdown("## 🚨 Incident History")
-    
+    st.markdown("## 🚨 Alert History")
     if not st.session_state.alerts:
-        st.info("No alerts recorded")
-    else:
-        for alert in reversed(st.session_state.alerts):
-            with st.expander(f"Alert - {alert['timestamp']}", expanded=True):
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.image(alert['image'], caption="Incident Capture", width=300)
-                with col2:
-                    emp = alert['details']
-                    st.markdown(f"""
-                    **🆔 Employee ID:** {alert['emp_id']}  
-                    **👤 Name:** {emp['name']}  
-                    **📞 Phone:** {emp['phone']}  
-                    **📧 Email:** {emp['email']}  
-                    **🔍 Match Confidence:** {alert['similarity']*100:.2f}%
-                    """)
-                st.markdown("---")
+        st.info("No alerts recorded yet.")
+        return
+    
+    for i, alert in enumerate(st.session_state.alerts):
+        with st.expander(f"Alert {i+1} - {alert['timestamp']}"):
+            col1, col2 = st.columns([1,2])
+            with col1:
+                st.image(alert['image'], width=200)
+            with col2:
+                st.write(f"Matched Employee: {alert['matched_emp']}")
+                st.write(f"Similarity: {alert['max_sim']:.2f}")
 
 if __name__ == "__main__":
     main()
