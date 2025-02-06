@@ -1,7 +1,7 @@
 import streamlit as st
-import cv2
-import numpy as np
 import requests
+import numpy as np
+import cv2
 import os
 import io
 import time
@@ -11,7 +11,6 @@ from tensorflow.keras.layers import DepthwiseConv2D, GlobalAveragePooling2D
 from PIL import Image
 from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
 # =====================================
 # APP CONFIGURATION
@@ -61,67 +60,6 @@ def load_embedding_model():
 # =====================================
 # MAIN APP
 # =====================================
-class VideoTransformer(VideoProcessorBase):
-    def __init__(self, spitnet_model, embedding_model):
-        self.spitnet_model = spitnet_model
-        self.embedding_model = embedding_model
-        self.alerts = []
-        self.frame_count = 0  # Frame counter
-
-    def recv(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        # Resize the image to reduce processing load
-        img_resized = cv2.resize(img, (320, 240))  # Resize to 320x240 for faster processing
-        img_gray_resized = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
-
-        # Face detection
-        faces = face_cascade.detectMultiScale(img_gray_resized, scaleFactor=1.1, minNeighbors=5)
-
-        # Process every nth frame to reduce load
-        self.frame_count += 1
-        if self.frame_count % 10 == 0:  # Process every 10th frame
-            for (x, y, w, h) in faces:
-                cv2.rectangle(img_resized, (x, y), (x + w, y + h), (255, 0, 0), 2)  # Draw rectangle around face
-                face_roi = img_resized[y:y + h, x:x + w]
-                img_face_resized = cv2.resize(face_roi, (224, 224))
-
-                # Spit detection
-                face_array = np.expand_dims(img_face_resized, axis=0).astype('float32') / 127.5 - 1
-                prediction = self.spitnet_model.predict(face_array)
-                class_index = np.argmax(prediction)
-                confidence = prediction[0][class_index]
-
-                # Debugging output
-                st.write(f"Class Index: {class_index}, Confidence: {confidence}")  # Debugging output
-
-                spitting_detected = class_index == 0 and confidence > 0.5  # Lowered threshold for testing
-
-                if spitting_detected:
-                    self.handle_spitting_alert(face_array, img_resized)
-
-        return av.VideoFrame.from_ndarray(img_resized, format="bgr24")
-
-    def handle_spitting_alert(self, face_array, img_array):
-        current_embedding = self.embedding_model.predict(face_array).flatten()
-        max_sim = 0
-        matched_emp = None
-        
-        for emp_id, emp in st.session_state.employees.items():
-            similarity = cosine_similarity([current_embedding], [emp['embedding']])[0][0]
-            if similarity > max_sim:
-                max_sim = similarity
-                matched_emp = emp_id
-        
-        alert_data = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "image": img_array,
-            "max_sim": max_sim,
-            "matched_emp": matched_emp
-        }
-        self.alerts.append(alert_data)
-
 def main():
     spitnet_model = load_spitnet_model()
     embedding_model = load_embedding_model()
