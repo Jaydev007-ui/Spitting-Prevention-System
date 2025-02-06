@@ -170,41 +170,17 @@ def handle_employee_management(embedding_model):
                     **📧 Email:** {details['email']}  
                     **🏠 Address:** {details['address']}
                     """)
-
 def handle_camera_stream(spitnet_model, embedding_model):
     st.markdown("## 📡 Live Monitoring")
     
-    flask_stream_url = st.text_input("Enter Flask Stream URL", placeholder="http://<raspberry_pi_ip>:5000/video_feed")
+    # Edit your Flask stream URL here
+    flask_stream_url = "http://<raspberry_pi_ip>:5000/video_feed"
     
-    if st.button("Start Stream"):
-        if not flask_stream_url:
-            st.error("Please enter a valid Flask stream URL.")
-            return
-        
-        st.write("### Video Feed")
-        video_placeholder = st.empty()
+    # Button to visit live stream page
+    if st.button("Visit Live Stream"):
+        # Redirect to the stream URL
+        st.markdown(f'<a href="{flask_stream_url}" target="_blank">Click here to visit the live stream</a>', unsafe_allow_html=True)
 
-        # Start capturing the video stream
-        while True:
-            try:
-                response = requests.get(flask_stream_url, stream=True)
-                bytes_data = b''
-                for chunk in response.iter_content(chunk_size=1024):
-                    bytes_data += chunk
-                    a = bytes_data.find(b'\xff\xd8')  # JPEG start
-                    b = bytes_data.find(b'\xff\xd9')  # JPEG end
-                    if a != -1 and b != -1:
-                        jpg = bytes_data[a:b + 2]  # Extract the JPEG image
-                        bytes_data = bytes_data[b + 2:]  # Remove the processed bytes
-                        # Convert the JPEG image to a NumPy array
-                        img = cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR)
-                        # Display the image in Streamlit
-                        video_placeholder.image(img, channels="BGR")
-            except Exception as e:
-                st.error(f"Error accessing the stream: {e}")
-                break
-
-    # Add image upload option for spitting detection
     st.markdown("---")
     st.markdown("## 📸 Upload Image for Spitting Detection")
     
