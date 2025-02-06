@@ -237,11 +237,6 @@ def handle_spitting_alert(face_array, embedding_model, img_array):
         **Identified Employee:** {emp['name']} ({matched_emp})  
         **Confidence:** {max_sim*100:.2f}%
         """)
-        
-        # Generate fine letter
-        if st.button("📄 Generate Fine Letter"):
-            generate_fine_letter(emp, alert)
-
     else:
         st.warning("No matching employee found")
 
@@ -299,6 +294,10 @@ def handle_alert_history():
                     **📧 Email:** {emp['email']}  
                     **🔍 Match Confidence:** {alert['similarity']*100:.2f}%
                     """)
+                    
+                    # Add button to generate fine letter for each alert
+                    if st.button(f"📄 Generate Fine Letter for {emp['name']}", key=alert['emp_id']):
+                        generate_fine_letter(emp, alert)
                 st.markdown("---")
 
 if __name__ == "__main__":
