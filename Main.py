@@ -101,13 +101,13 @@ def main():
             
         st.markdown("---")
         st.markdown("### 🧑‍💼 Employee Management")
-        menu = st.radio("Navigation", ["📁 Employee Database", "📷 Camera Stream", "🚨 Alert History"])
+        menu = st.radio("Navigation", ["📁 Employee Database", "📸 Upload Image for Detection", "🚨 Alert History"])
 
     # Main Content
     if menu == "📁 Employee Database":
         handle_employee_management(embedding_model)
-    elif menu == "📷 Camera Stream":
-        handle_camera_stream(spitnet_model, embedding_model)
+    elif menu == "📸 Upload Image for Detection":
+        handle_image_upload(spitnet_model, embedding_model)
     elif menu == "🚨 Alert History":
         handle_alert_history()
 
@@ -170,18 +170,8 @@ def handle_employee_management(embedding_model):
                     **📧 Email:** {details['email']}  
                     **🏠 Address:** {details['address']}
                     """)
-def handle_camera_stream(spitnet_model, embedding_model):
-    st.markdown("## 📡 Live Monitoring")
-    
-    # Edit your Flask stream URL here
-    flask_stream_url = "http://192.168.94.30:5000/video_feed"
-    
-    # Button to visit live stream page
-    if st.button("Visit Live Stream"):
-        # Redirect to the stream URL
-        st.markdown(f'<a href="{flask_stream_url}" target="_blank">Click here to visit the live stream</a>', unsafe_allow_html=True)
 
-    st.markdown("---")
+def handle_image_upload(spitnet_model, embedding_model):
     st.markdown("## 📸 Upload Image for Spitting Detection")
     
     uploaded_image = st.file_uploader("Upload an image for spitting detection", type=["jpg", "jpeg", "png"])
@@ -213,6 +203,11 @@ def handle_camera_stream(spitnet_model, embedding_model):
 
                 except Exception as e:
                     st.error(f"Processing error: {str(e)}")
+
+    # Button to redirect to live stream
+    st.markdown("---")
+    if st.button("🔴 Visit Live Stream"):
+        st.markdown("[Click here to view the live stream](http://192.168.94.30:5000)")
 
 def handle_spitting_alert(face_array, embedding_model, img_array):
     st.balloons()
