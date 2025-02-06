@@ -1,130 +1,155 @@
-import os
-import io
-import queue
 import streamlit as st
-import numpy as np
 import cv2
-from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import DepthwiseConv2D, GlobalAveragePooling2D
+import numpy as np
 from PIL import Image
-import time
-from sklearn.metrics.pairwise import cosine_similarity
-from tensorflow.keras.applications import MobileNet
-from tensorflow.keras.models import Model
-import av
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
-import threading
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from datetime import datetime
+from streamlit_webrtc import webrtc_streamer, RTCConfiguration
+import os
+import pickle
 
-# =====================================
-# APP CONFIGURATION
-# =====================================
-st.set_page_config(
-    page_title="Spitting Prevention System",
-    page_icon="🛡️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
-# Load Haar Cascade for face detection
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-
-# =====================================
-# MODEL LOADING
-# =====================================
-class CustomDepthwiseConv2D(DepthwiseConv2D):
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('groups', None)
-        super().__init__(*args, **kwargs)
-
-@st.cache_resource
+# Load SpitNet model for spitting detection
 def load_spitnet_model():
-    if not os.path.exists("keras_model.h5"):
-        st.error("Model file 'keras_model.h5' not found!")
-        return None
     try:
-        model = load_model("keras_model.h5", 
-                          compile=False,
-                          custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
-        if model.input_shape != (None, 224, 224, 3):
-            st.error("Model input shape mismatch! Expected (224, 224, 3)")
-            return None
+        model = tf.keras.models.load_model("spitnet_model.h5")
         return model
-    except Exception as e:
-        st.error(f"Model loading failed: {e}")
+    except:
+        st.error("SpitNet model not found!")
         return None
 
-@st.cache_resource
-def load_embedding_model():
-    base_model = MobileNet(weights='imagenet', include_top=False, input_shape=(224,224,3))
-    x = GlobalAveragePooling2D()(base_model.output)
-    model = Model(inputs=base_model.input, outputs=x)
-    return model
 
-# =====================================
-# MAIN APP
-# =====================================
-class VideoTransformer(VideoProcessorBase):
+# Load embedding model for facial recognition
+def load_embedding_model():
+    try:
+        model = tf.keras.models.load_model("embedding_model.h5")
+        return model
+    except:
+        st.error("Embedding model not found!")
+        return None
+
+
+# Preprocess image for embedding model
+def preprocess_image(image):
+    img_resized = cv2.resize(image, (224, 224))
+    img_array = np.expand_dims(img_resized, axis=0).astype('float32') / 127.5 - 1
+    return img_array
+
+
+# Video stream transformer class for facial recognition and spitting detection
+class VideoTransformer:
     def __init__(self, spitnet_model, embedding_model):
         self.spitnet_model = spitnet_model
         self.embedding_model = embedding_model
-        self.alerts = []
-        self.frame_count = 0  # Frame counter
+        self.embeddings = {}
+        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-    def recv(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        # Resize the image to reduce processing load
-        img_resized = cv2.resize(img, (320, 240))  # Resize to 320x240 for faster processing
-        img_gray_resized = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
-
-        # Face detection
-        faces = face_cascade.detectMultiScale(img_gray_resized, scaleFactor=1.1, minNeighbors=5)
-
-        # Process every nth frame to reduce load
-        self.frame_count += 1
-        if self.frame_count % 10 == 0:  # Process every 10th frame
-            for (x, y, w, h) in faces:
-                cv2.rectangle(img_resized, (x, y), (x + w, y + h), (255, 0, 0), 2)  # Draw rectangle around face
-                face_roi = img_resized[y:y + h, x:x + w]
-                img_face_resized = cv2.resize(face_roi, (224, 224))
-
-                # Spit detection
-                face_array = np.expand_dims(img_face_resized, axis=0).astype('float32') / 127.5 - 1
-                prediction = self.spitnet_model.predict(face_array)
-                class_index = np.argmax(prediction)
-                confidence = prediction[0][class_index]
-
-                # Debugging output
-                st.write(f"Class Index: {class_index}, Confidence: {confidence}")  # Debugging output
-
-                spitting_detected = class_index == 0 and confidence > 0.5  # Lowered threshold for testing
-
-                if spitting_detected:
-                    self.handle_spitting_alert(face_array, img_resized)
-
-        return av.VideoFrame.from_ndarray(img_resized, format="bgr24")
-
-    def handle_spitting_alert(self, face_array, img_array):
-        current_embedding = self.embedding_model.predict(face_array).flatten()
-        max_sim = 0
-        matched_emp = None
+    def transform(self, frame):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
         
+        for (x, y, w, h) in faces:
+            face = frame[y:y+h, x:x+w]
+            face_preprocessed = preprocess_image(face)
+            embedding = self.embedding_model.predict(face_preprocessed).flatten()
+
+            # Compare with stored embeddings to identify the employee
+            matched_employee = None
+            min_dist = 100
+
+            for emp_id, emp in st.session_state.employees.items():
+                dist = np.linalg.norm(embedding - emp['embedding'])
+                if dist < min_dist:
+                    min_dist = dist
+                    matched_employee = emp
+
+            if matched_employee:
+                # Spitting detection
+                face_expanded = np.expand_dims(face_preprocessed, axis=0)
+                spit_pred = self.spitnet_model.predict(face_expanded)
+                spit_status = "No Spitting"
+
+                if spit_pred > 0.5:
+                    spit_status = "Spitting Detected"
+                    # Save alert and image
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    alert_data = {
+                        'timestamp': timestamp,
+                        'image': frame,
+                        'max_sim': min_dist,
+                        'matched_emp': matched_employee['name']
+                    }
+                    st.session_state.alerts.append(alert_data)
+
+                # Draw rectangle around face and display status
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+                cv2.putText(frame, f"{matched_employee['name']}: {spit_status}", (x, y-10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+        return frame
+
+
+def handle_employee_management(embedding_model):
+    st.subheader("🔑 Manage Employee Records")
+    st.markdown("Upload images of employees for facial recognition.")
+
+    uploaded_files = st.file_uploader("Upload Employee Images", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
+    
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            image = Image.open(uploaded_file)
+            img_array = np.array(image)
+
+            # Preprocess image for embedding model
+            img_resized = cv2.resize(img_array, (224, 224))
+            face_array = np.expand_dims(img_resized, axis=0).astype('float32') / 127.5 - 1
+            embedding = embedding_model.predict(face_array).flatten()
+
+            # Store employee data in session state
+            employee_id = uploaded_file.name.split('.')[0]
+            st.session_state.employees[employee_id] = {
+                'name': uploaded_file.name,
+                'embedding': embedding
+            }
+        
+        st.success("Employee images uploaded successfully!")
+
+    # Display employee list
+    if st.session_state.employees:
+        st.subheader("🔍 Employee List")
         for emp_id, emp in st.session_state.employees.items():
-            similarity = cosine_similarity([current_embedding], [emp['embedding']])[0][0]
-            if similarity > max_sim:
-                max_sim = similarity
-                matched_emp = emp_id
-        
-        alert_data = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "image": img_array,
-            "max_sim": max_sim,
-            "matched_emp": matched_emp
-        }
-        self.alerts.append(alert_data)
+            st.write(f"Employee Name: {emp['name']}")
+            st.write(f"Embedding Length: {len(emp['embedding'])} (Embeddings stored)")
+            st.write("---")
+
+
+def handle_camera_stream(spitnet_model, embedding_model):
+    st.subheader("🎥 Camera Stream")
+
+    webrtc_streamer(
+        key="spitting-prevention-system",
+        video_processor_factory=lambda: VideoTransformer(spitnet_model, embedding_model),
+        rtc_configuration=RTCConfiguration({"iceServers": [{"urls": "stun:stun.l.google.com:19302"}]}),
+        media_stream_constraints={"video": True, "audio": False},
+        video_html_attrs={"style": {"transform": "rotateY(180deg)"}}  # Rotate video
+    )
+
+
+def handle_alert_history():
+    st.subheader("🚨 Alert History")
+    
+    if not st.session_state.alerts:
+        st.write("No alerts generated yet.")
+    else:
+        for alert in st.session_state.alerts:
+            st.write(f"Alert at {alert['timestamp']}")
+            st.image(alert['image'], caption=f"Spitting Detected: {alert['max_sim']:.2f} | Matched Employee: {alert['matched_emp']}")
+            st.write("---")
+
 
 def main():
+    # The main function is where everything ties together.
     spitnet_model = load_spitnet_model()
     embedding_model = load_embedding_model()
 
@@ -175,93 +200,7 @@ def main():
     elif menu == "🚨 Alert History":
         handle_alert_history()
 
-def handle_employee_management(embedding_model):
-    st.markdown("## 👥 Employee Management")
-    
-    with st.form("employee_form", clear_on_submit=True):
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.subheader("📝 Employee Details")
-            name = st.text_input("Full Name", placeholder="John Doe")
-            phone = st.text_input("Phone Number", placeholder="+91 9876543210")
-            email = st.text_input("Email Address", placeholder="john@company.com")
-            address = st.text_area("Residential Address", placeholder="123 Main St, City")
-        with col2:
-            st.subheader("📸 Photo Upload")
-            photo = st.file_uploader("Upload employee photo", type=["jpg", "jpeg", "png"])
-            if photo:
-                image = Image.open(photo)
-                st.image(image, caption="Employee Photo", use_column_width=True)
-        
-        if st.form_submit_button("➕ Add Employee"):
-            if not all([name, phone, email, address, photo]):
-                st.error("All fields are required!")
-            else:
-                try:
-                    img = Image.open(photo).convert('RGB')
-                    img_resized = img.resize((224, 224))
-                    img_array = np.array(img_resized)
-                    
-                    face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
-                    embedding = embedding_model.predict(face_array).flatten()
-                    
-                    emp_id = f"EMP{len(st.session_state.employees)+1:03d}"
-                    st.session_state.employees[emp_id] = {
-                        "name": name,
-                        "phone": phone,
-                        "email": email,
-                        "address": address,
-                        "photo": photo.getvalue(),
-                        "embedding": embedding
-                    }
-                    st.success(f"Employee {emp_id} added successfully!")
-                except Exception as e:
-                    st.error(f"Error processing photo: {e}")
 
-    st.markdown("---")
-    st.subheader("📋 Registered Employees")
-    if not st.session_state.employees:
-        st.info("No employees registered")
-    else:
-        for emp_id, details in st.session_state.employees.items():
-            with st.expander(f"{emp_id} - {details['name']}"):
-                col1, col2 = st.columns([1,3])
-                with col1:
-                    st.image(Image.open(io.BytesIO(details['photo'])), width=150)
-                with col2:
-                    st.write(f"**Phone:** {details['phone']}")
-                    st.write(f"**Email:** {details['email']}")
-                    st.write(f"**Address:** {details['address']}")
-                    if st.button(f"❌ Remove {emp_id}", key=f"remove_{emp_id}"):
-                        del st.session_state.employees[emp_id]
-                        st.success(f"Employee {emp_id} removed successfully")
-                        st.rerun()
-
-def handle_camera_stream(spitnet_model, embedding_model):
-    st.markdown("## 📷 Live Camera Stream")
-    
-    webrtc_streamer(
-        key="spit-prevention-stream",
-        video_processor_factory=lambda: VideoTransformer(spitnet_model, embedding_model),
-        rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
-        media_stream_constraints={"video": True, "audio": False},
-        async_processing=True
-    )
-
-def handle_alert_history():
-    st.markdown("## 🚨 Alert History")
-    if not st.session_state.alerts:
-        st.info("No alerts recorded yet.")
-        return
-    
-    for i, alert in enumerate(st.session_state.alerts):
-        with st.expander(f"Alert {i+1} - {alert['timestamp']}"):
-            col1, col2 = st.columns([1,2])
-            with col1:
-                st.image(alert['image'], width=200)
-            with col2:
-                st.write(f"Matched Employee: {alert['matched_emp']}")
-                st.write(f"Similarity: {alert['max_sim']:.2f}")
-
+# Entry point for running the application
 if __name__ == "__main__":
     main()
