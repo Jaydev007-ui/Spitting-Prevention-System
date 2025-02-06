@@ -326,5 +326,99 @@ def handle_alert_history():
                     """)
                 st.markdown("---")
 
+def handle_image_upload_for_detection(spitnet_model, embedding_model):
+    st.markdown("## 📸 Upload Image for Spitting Detection")
+    
+    uploaded_image = st.file_uploader("Upload an image for spitting detection", type=["jpg", "jpeg", "png"])
+    
+    if uploaded_image:
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.spinner("🔍 Analyzing..."):
+                try:
+                    image = Image.open(uploaded_image).convert('RGB')
+                    img_array = np.array(image)
+                    
+                    img_resized = Image.fromarray(img_array).resize((224, 224))
+                    img_array = np.array(img_resized)
+                    
+                    face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
+                    prediction = spitnet_model.predict(face_array)
+                    class_index = np.argmax(prediction)
+                    confidence = prediction[0][class_index]
+                    
+                    spitting_detected = class_index == 0 and confidence > 0.5  # Lowered threshold for testing
+                    
+                    st.image(img_resized, caption="Processed Image", use_column_width=True)
+                    
+                    if spitting_detected:
+                        handle_spitting_alert(face_array, embedding_model, img_array)
+                    else:
+                        st.success("## ✅ All Clear: No Spitting Detected")
+
+                except Exception as e:
+                    st.error(f"Processing error: {str(e)}")
+
+def handle_camera_stream(spitnet_model, embedding_model):
+    st.markdown("## 📡 Live Monitoring")
+    
+    ip_camera_url = st.text_input("Enter IP Camera URL", placeholder="rtsp://username:password@ip_address:port/path")
+    
+    if st.button("Start Stream"):
+        if not ip_camera_url:
+            st.error("Please enter a valid IP camera URL.")
+            return
+        
+        st.write("### IP Camera Feed")
+        webrtc_ctx = webrtc_streamer(
+            key="example",
+            video_processor_factory=lambda: VideoTransformer(spitnet_model, embedding_model),
+            rtc_configuration=RTCConfiguration(
+                {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+            ),
+            media_stream_constraints={"video": True, "audio": False},
+        )
+        
+        # Open the video stream from the IP camera
+        cap = cv2.VideoCapture(ip_camera_url)
+        if not cap.isOpened():
+            st.error("Failed to open the video stream. Please check the URL.")
+            return
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Failed to read frame from the camera.")
+                break
+            
+            # Process the frame
+            img_resized = cv2.resize(frame, (320, 240))
+            img_frame = av.VideoFrame.from_ndarray(img_resized, format="bgr24")
+            webrtc_ctx.video_processor.recv(img_frame)
+
+        cap.release()
+
+def handle_alert_history():
+    st.markdown("## 🚨 Incident History")
+    
+    if not st.session_state.alerts:
+        st.info("No alerts recorded")
+    else:
+        for alert in reversed(st.session_state.alerts):
+            with st.expander(f"Alert - {alert['timestamp']}", expanded=True):
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    st.image(alert['image'], caption="Incident Capture", width=300)
+                with col2:
+                    emp = alert['details']
+                    st.markdown(f"""
+                    **🆔 Employee ID:** {alert['emp_id']}  
+                    **👤 Name:** {emp['name']}  
+                    **📞 Phone:** {emp['phone']}  
+                    **📧 Email:** {emp['email']}  
+                    **🔍 Match Confidence:** {alert['similarity']*100:.2f}%
+                    """)
+                st.markdown("---")
+
 if __name__ == "__main__":
     main()
