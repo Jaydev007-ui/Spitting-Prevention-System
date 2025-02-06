@@ -11,7 +11,6 @@ from tensorflow.keras.layers import DepthwiseConv2D, GlobalAveragePooling2D
 from PIL import Image
 from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
-from fpdf import FPDF  # Import FPDF for PDF generation
 
 # =====================================
 # APP CONFIGURATION
@@ -247,32 +246,37 @@ def handle_spitting_alert(face_array, embedding_model, img_array):
         st.warning("No matching employee found")
 
 def generate_fine_letter(emp, alert):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    # Create HTML content for the fine letter
+    html_content = f"""
+    <html>
+    <head>
+        <title>Fine Letter</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            h1 {{ text-align: center; }}
+            p {{ font-size: 14px; }}
+        </style>
+    </head>
+    <body>
+        <h1>Fine Letter</h1>
+        <p>Date: {alert['timestamp']}</p>
+        <p>Employee ID: {alert['emp_id']}</p>
+        <p>Name: {emp['name']}</p>
+        <p>Phone: {emp['phone']}</p>
+        <p>Email: {emp['email']}</p>
+        <p>Address: {emp['address']}</p>
+        <p>This is to inform you that spitting has been detected.</p>
+        <p>Please adhere to the company's hygiene policies.</p>
+    </body>
+    </html>
+    """
 
-    # Add content to the PDF
-    pdf.cell(200, 10, txt="Fine Letter", ln=True, align='C')
-    pdf.cell(200, 10, txt=f"Date: {alert['timestamp']}", ln=True)
-    pdf.cell(200, 10, txt=f"Employee ID: {alert['emp_id']}", ln=True)
-    pdf.cell(200, 10, txt=f"Name: {emp['name']}", ln=True)
-    pdf.cell(200, 10, txt=f"Phone: {emp['phone']}", ln=True)
-    pdf.cell(200, 10, txt=f"Email: {emp['email']}", ln=True)
-    pdf.cell(200, 10, txt=f"Address: {emp['address']}", ln=True)
-    pdf.cell(200, 10, txt="This is to inform you that spitting has been detected.", ln=True)
-    pdf.cell(200, 10, txt="Please adhere to the company's hygiene policies.", ln=True)
-
-    # Save the PDF to a BytesIO object
-    pdf_output = io.BytesIO()
-    pdf.output(pdf_output)
-    pdf_output.seek(0)
-
-    # Provide a download link for the PDF
+    # Provide a download link for the HTML file
     st.download_button(
         label="Download Fine Letter",
-        data=pdf_output,
-        file_name=f"fine_letter_{alert['emp_id']}.pdf",
-        mime="application/pdf"
+        data=html_content,
+        file_name=f"fine_letter_{alert['emp_id']}.html",
+        mime="text/html"
     )
 
 def handle_alert_history():
