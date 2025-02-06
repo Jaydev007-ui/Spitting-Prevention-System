@@ -13,7 +13,6 @@ from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
 import av
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
-import threading
 
 # =====================================
 # APP CONFIGURATION
