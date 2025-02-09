@@ -238,15 +238,7 @@ def handle_image_upload(yolo_model, embedding_model):
                 - Report any hygiene concerns immediately
                 """)
 
-    # Live stream section remains unchanged
-    st.markdown("---")
-    if st.button("🔴 Visit Live Stream"):
-        st.markdown("[Click here to view the live stream](http://192.168.94.30:5000)")
-
-    # Button to redirect to live stream
-    st.markdown("---")
-    if st.button("🔴 Visit Live Stream"):
-        st.markdown("[Click here to view the live stream](http://192.168.94.30:5000)")
+   
 
 def handle_spitting_alert(face_array, embedding_model, img_array):
     st.balloons()
