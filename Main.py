@@ -13,6 +13,7 @@ from PIL import Image
 from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
 from datetime import datetime
+import torch  # Import PyTorch for YOLOv5
 
 # =====================================
 # APP CONFIGURATION
@@ -36,38 +37,24 @@ class CustomDepthwiseConv2D(DepthwiseConv2D):
         super().__init__(*args, **kwargs)
 
 @st.cache_resource
-def load_spitnet_model():
-    if not os.path.exists("keras_model.h5"):
-        st.error("Model file 'keras_model.h5' not found!")
-        return None
-    try:
-        model = load_model("keras_model.h5", 
-                          compile=False,
-                          custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D})
-        if model.input_shape != (None, 224, 224, 3):
-            st.error("Model input shape mismatch! Expected (224, 224, 3)")
-            return None
-        return model
-    except Exception as e:
-        st.error(f"Model loading failed: {e}")
-        return None
-
-@st.cache_resource
 def load_embedding_model():
     base_model = MobileNet(weights='imagenet', include_top=False, input_shape=(224,224,3))
     x = GlobalAveragePooling2D()(base_model.output)
     model = Model(inputs=base_model.input, outputs=x)
     return model
 
+# Load YOLOv5 model
+@st.cache_resource
+def load_yolo_model():
+    model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt')  # Load your custom YOLOv5 model
+    return model
+
 # =====================================
 # MAIN APP
 # =====================================
 def main():
-    spitnet_model = load_spitnet_model()
     embedding_model = load_embedding_model()
-
-    if not spitnet_model:
-        return
+    yolo_model = load_yolo_model()
 
     st.markdown("## 🛡️ SPITTING PREVENTION SYSTEM")
 
@@ -109,7 +96,7 @@ def main():
     if menu == "📁 Employee Database":
         handle_employee_management(embedding_model)
     elif menu == "📸 Upload Image for Detection":
-        handle_image_upload(spitnet_model, embedding_model)
+        handle_image_upload(yolo_model, embedding_model)
     elif menu == "🚨 Alert History":
         handle_alert_history()
 
@@ -173,7 +160,7 @@ def handle_employee_management(embedding_model):
                     **🏠 Address:** {details['address']}
                     """)
 
-def handle_image_upload(spitnet_model, embedding_model):
+def handle_image_upload(yolo_model, embedding_model):
     st.markdown("## 📸 Upload Image for Spitting Detection")
     
     uploaded_image = st.file_uploader("Upload an image for spitting detection", type=["jpg", "jpeg", "png"])
@@ -186,20 +173,21 @@ def handle_image_upload(spitnet_model, embedding_model):
                     image = Image.open(uploaded_image).convert('RGB')
                     img_array = np.array(image)
                     
-                    img_resized = Image.fromarray(img_array).resize((224, 224))
-                    img_array = np.array(img_resized)
+                    # Convert image to a format suitable for YOLOv5
+                    results = yolo_model(img_array)  # Run inference
+                    detections = results.pred[0]  # Get detections
+
+                    # Process detections
+                    spitting_detected = False
+                    for *box, conf, cls in detections:
+                        if conf > 0.5 and int(cls) == 0:  # Assuming class 0 is for spitting
+                            spitting_detected = True
+                            break
                     
-                    face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
-                    prediction = spitnet_model.predict(face_array)
-                    class_index = np.argmax(prediction)
-                    confidence = prediction[0][class_index]
-                    
-                    spitting_detected = class_index == 0 and confidence > 0.5  # Lowered threshold for testing
-                    
-                    st.image(img_resized, caption="Processed Image", use_column_width=True)
+                    st.image(image, caption="Processed Image", use_column_width=True)
                     
                     if spitting_detected:
-                        handle_spitting_alert(face_array, embedding_model, img_array)
+                        handle_spitting_alert(img_array, embedding_model, img_array)
                     else:
                         st.success("## ✅ All Clear: No Spitting Detected")
 
