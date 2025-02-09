@@ -170,29 +170,78 @@ def handle_image_upload(yolo_model, embedding_model):
         with col1:
             with st.spinner("🔍 Analyzing..."):
                 try:
+                    # Load and convert image
                     image = Image.open(uploaded_image).convert('RGB')
                     img_array = np.array(image)
                     
-                    # Convert image to a format suitable for YOLOv5
-                    results = yolo_model(img_array)  # Run inference
-                    detections = results.pred[0]  # Get detections
-
-                    # Process detections
+                    # YOLOv5 Detection
+                    results = yolo_model(img_array)
+                    detections = results.pred[0]
+                    
+                    # Initialize detection flags
                     spitting_detected = False
-                    for *box, conf, cls in detections:
-                        if conf > 0.5 and int(cls) == 0:  # Assuming class 0 is for spitting
-                            spitting_detected = True
-                            break
+                    annotated_image = image.copy()
                     
-                    st.image(image, caption="Processed Image", use_column_width=True)
-                    
+                    # Process detections
+                    if detections is not None and len(detections) > 0:
+                        for *box, conf, cls in detections:
+                            if conf > 0.5 and int(cls) == 0:  # Class 0 = spitting
+                                spitting_detected = True
+                                
+                                # Draw bounding box
+                                x1, y1, x2, y2 = map(int, box)
+                                draw = ImageDraw.Draw(annotated_image)
+                                draw.rectangle([x1, y1, x2, y2], outline="red", width=3)
+                                
+                                # Add confidence text
+                                text = f"Spit: {conf:.2f}"
+                                draw.text((x1, y1-20), text, fill="red")
+
+                    # Display results
                     if spitting_detected:
+                        st.image(annotated_image, 
+                               caption="Spitting Detected - Visual Evidence", 
+                               use_column_width=True)
                         handle_spitting_alert(img_array, embedding_model, img_array)
                     else:
-                        st.success("## ✅ All Clear: No Spitting Detected")
+                        st.image(image, 
+                               caption="No Spitting Detected - All Clear", 
+                               use_column_width=True)
+                        st.success("""
+                        ## ✅ System Verification Complete
+                        **Status:** No spitting behavior detected  
+                        **Recommendation:** Maintain good public hygiene practices
+                        """)
 
                 except Exception as e:
-                    st.error(f"Processing error: {str(e)}")
+                    st.error(f"🚨 Processing Error: {str(e)}")
+                    st.error("Please ensure the uploaded file is a valid image")
+
+        with col2:
+            st.markdown("### 🔬 Detection Analysis")
+            if spitting_detected:
+                st.error("""
+                ## 🚨 Behavioral Alert
+                **Violation Detected:** Public spitting incident  
+                **Action Required:**
+                - Immediate sanitation required
+                - Employee identification in progress
+                - Automated fine processing initiated
+                """)
+            else:
+                st.success("""
+                ## 🟢 Hygiene Compliance Verified
+                **System Confirmed:** No public health violation  
+                **Recommended Actions:**
+                - Continue regular sanitation protocols
+                - Maintain COVID-safe practices
+                - Report any hygiene concerns immediately
+                """)
+
+    # Live stream section remains unchanged
+    st.markdown("---")
+    if st.button("🔴 Visit Live Stream"):
+        st.markdown("[Click here to view the live stream](http://192.168.94.30:5000)")
 
     # Button to redirect to live stream
     st.markdown("---")
