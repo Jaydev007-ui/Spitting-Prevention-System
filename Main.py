@@ -46,7 +46,7 @@ def load_embedding_model():
 # Load YOLOv5 model
 @st.cache_resource
 def load_yolo_model():
-    model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt')  # Load your custom YOLOv5 model
+    model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt', force_reload=True)  # Load your custom YOLOv5 model
     return model
 
 # =====================================
