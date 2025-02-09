@@ -1,8 +1,8 @@
 streamlit
-streamlit-webrtc
-opencv-python-headless
-tensorflow
-scikit-learn
+torch
+torchvision
+Pillow
 numpy
-pillow
-av
+opencv-python
+scikit-learn
+tensorflow
