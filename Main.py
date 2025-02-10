@@ -294,4 +294,4 @@ def handle_alert_history():
 if __name__ == "__main__":
     main()
 
-remove ip camera add only upload image option and second add a button to visit live stream which link i add in code and when i press button so i redrict to other bage of web.
+
