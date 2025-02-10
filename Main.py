@@ -9,9 +9,7 @@ import base64
 from sklearn.metrics.pairwise import cosine_similarity
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import DepthwiseConv2D, GlobalAveragePooling2D
-from PIL import Image
-from tensorflow.keras.applications import MobileNet
-from tensorflow.keras.models import Model
+from PIL import Image, ImageDraw
 from datetime import datetime
 import torch  # Import PyTorch for YOLOv5
 
@@ -31,16 +29,9 @@ face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fronta
 # =====================================
 # MODEL LOADING
 # =====================================
-class CustomDepthwiseConv2D(DepthwiseConv2D):
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('groups', None)
-        super().__init__(*args, **kwargs)
-
 @st.cache_resource
 def load_embedding_model():
-    base_model = MobileNet(weights='imagenet', include_top=False, input_shape=(224,224,3))
-    x = GlobalAveragePooling2D()(base_model.output)
-    model = Model(inputs=base_model.input, outputs=x)
+    model = load_model('keras_model.h5')  # Load your Keras model
     return model
 
 # Load YOLOv5 model
@@ -124,10 +115,11 @@ def handle_employee_management(embedding_model):
             else:
                 try:
                     img = Image.open(photo).convert('RGB')
-                    img_resized = img.resize((224, 224))
+                    img_resized = img.resize((224, 224))  # Ensure this matches your model's input size
                     img_array = np.array(img_resized)
                     
-                    face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1
+                    # Preprocess the image as required by your Keras model
+                    face_array = np.expand_dims(img_array, axis=0).astype('float32') / 127.5 - 1  # Example normalization
                     embedding = embedding_model.predict(face_array).flatten()
                     
                     emp_id = f"EMP{len(st.session_state.employees)+1:03d}"
@@ -237,8 +229,6 @@ def handle_image_upload(yolo_model, embedding_model):
                 - Maintain COVID-safe practices
                 - Report any hygiene concerns immediately
                 """)
-
-   
 
 def handle_spitting_alert(face_array, embedding_model, img_array):
     st.balloons()
