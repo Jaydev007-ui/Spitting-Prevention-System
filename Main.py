@@ -174,7 +174,7 @@ def handle_employee_management(embedding_model):
 def handle_camera_stream(spitnet_model, embedding_model):
     st.markdown("## 📡 Live Monitoring")
     
-    ip_address = st.text_input("Enter IP Camera Address", placeholder="http://<ip_address>/video_feed")
+    ip_address = "http://192.168.94.41:8080"
     
     if st.button("Start Stream"):
         if not ip_address:
