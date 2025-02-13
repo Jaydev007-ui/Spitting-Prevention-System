@@ -174,11 +174,11 @@ def handle_employee_management(embedding_model):
 def handle_camera_stream(spitnet_model, embedding_model):
     st.markdown("## 📡 Live Monitoring")
     
-    flask_stream_url = st.text_input("Enter Flask Stream URL", placeholder="http://<raspberry_pi_ip>:5000/video_feed")
+    ip_address = st.text_input("Enter IP Camera Address", placeholder="http://<ip_address>/video_feed")
     
     if st.button("Start Stream"):
-        if not flask_stream_url:
-            st.error("Please enter a valid Flask stream URL.")
+        if not ip_address:
+            st.error("Please enter a valid IP camera address.")
             return
         
         st.write("### Video Feed")
@@ -187,7 +187,7 @@ def handle_camera_stream(spitnet_model, embedding_model):
         # Start capturing the video stream
         while True:
             try:
-                response = requests.get(flask_stream_url, stream=True)
+                response = requests.get(ip_address, stream=True)
                 bytes_data = b''
                 for chunk in response.iter_content(chunk_size=1024):
                     bytes_data += chunk
@@ -293,5 +293,3 @@ def handle_alert_history():
 
 if __name__ == "__main__":
     main()
-
-
