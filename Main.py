@@ -175,7 +175,7 @@ def handle_camera_stream(spitnet_model, embedding_model):
     st.markdown("## 📡 Live Monitoring")
     
     # RTSP URL for Raspberry Pi Camera
-    rtsp_url = "http://192.168.94.30:5000"
+    rtsp_url = "http://192.168.94.30:5000/video_feed"
     
     if st.button("Start Stream"):
         if not rtsp_url:
