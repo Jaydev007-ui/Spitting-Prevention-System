@@ -174,35 +174,41 @@ def handle_employee_management(embedding_model):
 def handle_camera_stream(spitnet_model, embedding_model):
     st.markdown("## 📡 Live Monitoring")
     
-    ip_address = "http://192.168.94.41:8080"
+    # RTSP URL for Raspberry Pi Camera
+    rtsp_url = "http://192.168.94.30:5000"
     
     if st.button("Start Stream"):
-        if not ip_address:
-            st.error("Please enter a valid IP camera address.")
+        if not rtsp_url:
+            st.error("Please enter a valid RTSP camera address.")
             return
-        
+
         st.write("### Video Feed")
         video_placeholder = st.empty()
 
-        # Start capturing the video stream
-        while True:
-            try:
-                response = requests.get(ip_address, stream=True)
-                bytes_data = b''
-                for chunk in response.iter_content(chunk_size=1024):
-                    bytes_data += chunk
-                    a = bytes_data.find(b'\xff\xd8')  # JPEG start
-                    b = bytes_data.find(b'\xff\xd9')  # JPEG end
-                    if a != -1 and b != -1:
-                        jpg = bytes_data[a:b + 2]  # Extract the JPEG image
-                        bytes_data = bytes_data[b + 2:]  # Remove the processed bytes
-                        # Convert the JPEG image to a NumPy array
-                        img = cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR)
-                        # Display the image in Streamlit
-                        video_placeholder.image(img, channels="BGR")
-            except Exception as e:
-                st.error(f"Error accessing the stream: {e}")
+        # Start capturing the video stream via RTSP
+        cap = cv2.VideoCapture(rtsp_url)
+        if not cap.isOpened():
+            st.error("Unable to open video stream.")
+            return
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Failed to grab frame from stream.")
                 break
+
+            # Process frame for face and spitting detection
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+            # Draw rectangle around detected faces
+            for (x, y, w, h) in faces:
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+
+            # Display the frame in Streamlit
+            video_placeholder.image(frame, channels="BGR")
+
+        cap.release()
 
     # Add image upload option for spitting detection
     st.markdown("---")
